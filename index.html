@@ -6,7 +6,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#000000">
-    <title>MondrianMarket · Fluid Grid</title>
+    <title>MondrianMarket · Stable Grid</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@200;400;600&display=swap');
 
@@ -23,29 +23,29 @@
             color: #F0F0F0;
         }
 
-        /* --- GRIGLIA FLUIDA --- */
+        /* --- GRIGLIA FLUIDA (No spazi vuoti) --- */
         #grid-container {
             display: grid;
-            /* Usiamo le frazioni (fr) per far adattare i box in modo proporzionale */
-            grid-template-columns: var(--col1, 1fr) var(--col2, 1fr) var(--col3, 1fr);
-            grid-template-rows: var(--row1, 1fr) var(--row2, 1fr);
+            grid-template-columns: var(--c1, 33.33%) var(--c2, 33.33%) var(--c3, 33.34%);
+            grid-template-rows: var(--r1, 50%) var(--r2, 50%);
             width: 100%;
             height: 100%;
-            gap: 3px; /* Linee Mondrian */
-            background-color: #000; /* Colore delle linee */
+            gap: 3px; /* Spessore linee nere */
+            background-color: #000; 
             position: relative;
         }
 
         .box {
             position: relative;
-            background-color: #0B1B2B; /* Default Up */
+            background-color: #0B1B2B;
             display: flex;
-            flex-direction: column;
             justify-content: center;
             align-items: center;
-            transition: background-color 0.5s ease, transform 0.3s ease, opacity 0.3s ease;
+            transition: background-color 0.5s ease, transform 0.2s ease, opacity 0.2s ease;
             overflow: hidden;
             z-index: 1;
+            /* Previene lo scroll nativo su iOS mentre si trascina */
+            touch-action: none; 
         }
 
         .box.up { background-color: #0B1B2B; }
@@ -57,12 +57,11 @@
             top: 0; left: 0; width: 100%; height: 100%;
             z-index: 100;
             border: none;
-            transform: scale(1);
         }
 
         /* Animazione Drag & Drop (Swap) */
         .box.dragging {
-            opacity: 0.5;
+            opacity: 0.3;
             transform: scale(0.95);
             z-index: 50;
         }
@@ -72,7 +71,6 @@
         }
 
         /* --- CONTENUTI INTERNI (Safe Area iOS) --- */
-        /* Usiamo un wrapper interno per gestire la safe area senza interrompere il colore */
         .box-content {
             display: flex;
             flex-direction: column;
@@ -83,21 +81,19 @@
             pointer-events: none; /* I click passano al box genitore */
         }
 
-        /* Push del testo in alto per i box della prima riga */
-        .box:nth-child(1) .box-content,
-        .box:nth-child(2) .box-content,
-        .box:nth-child(3) .box-content {
+        /* Applica la safe area solo al contenuto, non al colore di sfondo */
+        #grid-container > .box:nth-child(1) .box-content,
+        #grid-container > .box:nth-child(2) .box-content,
+        #grid-container > .box:nth-child(3) .box-content {
             padding-top: env(safe-area-inset-top);
         }
 
-        /* Push del testo in basso per i box della seconda riga */
-        .box:nth-child(4) .box-content,
-        .box:nth-child(5) .box-content,
-        .box:nth-child(6) .box-content {
+        #grid-container > .box:nth-child(4) .box-content,
+        #grid-container > .box:nth-child(5) .box-content,
+        #grid-container > .box:nth-child(6) .box-content {
             padding-bottom: env(safe-area-inset-bottom);
         }
 
-        /* Fix per il focus mode (occupa tutto lo schermo, quindi gestiamo entrambe le safe area) */
         .box.focus-mode .box-content {
             padding-top: env(safe-area-inset-top);
             padding-bottom: env(safe-area-inset-bottom);
@@ -105,13 +101,14 @@
 
         .tf-label {
             position: absolute; 
-            top: 10px; 
-            left: 10px;
+            top: 15px; left: 15px;
             font-size: 0.8rem; font-weight: 600;
             color: rgba(255,255,255,0.4);
             letter-spacing: 0.1em;
         }
         
+        .box.focus-mode .tf-label { top: calc(15px + env(safe-area-inset-top)); left: 25px; font-size: 1.2rem; }
+
         .tf-count {
             font-size: 3rem; font-weight: 200; line-height: 1;
             text-shadow: 0 5px 15px rgba(0,0,0,0.3);
@@ -121,69 +118,42 @@
         .tf-dots { display: flex; gap: 6px; margin-top: 10px; }
         .dot { width: 10px; height: 10px; border-radius: 50%; background-color: #E0E0E0; }
 
-        /* --- RESIZER DIVIDERS (Linee invisibili per ridimensionare) --- */
+        /* --- RESIZER DIVIDERS --- */
         .resizer {
             position: absolute;
             background: transparent;
             z-index: 20;
+            touch-action: none;
         }
-        /* Verticali (tra colonna 1-2 e 2-3) */
+        /* Verticali */
         .resizer-v {
-            width: 20px;
+            width: 30px;
             height: 100%;
             cursor: col-resize;
             top: 0;
         }
-        .resizer-v:nth-of-type(1) { left: calc(33.33% - 10px); }
-        .resizer-v:nth-of-type(2) { left: calc(66.66% - 10px); }
+        .resizer-v[data-index="0"] { left: calc(var(--c1, 33.33%) - 15px); }
+        .resizer-v[data-index="1"] { left: calc(var(--c1, 33.33%) + var(--c2, 33.33%) - 15px); }
 
-        /* Orizzontale (tra riga 1 e 2) */
+        /* Orizzontale */
         .resizer-h {
-            height: 20px;
+            height: 30px;
             width: 100%;
             cursor: row-resize;
             left: 0;
-            top: calc(50% - 10px);
+            top: calc(var(--r1, 50%) - 15px);
         }
-
-        /* --- PILLOLE --- */
-        #price-pill, #coin-pill {
-            position: absolute; left: 50%;
-            background: rgba(20, 20, 20, 0.8);
-            backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
-            border: 1px solid rgba(255, 255, 255, 0.15);
-            border-radius: 50px;
-            display: flex; align-items: center;
-            opacity: 0; transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-            z-index: 200; pointer-events: none;
-        }
-        #price-pill { 
-            bottom: calc(10% + env(safe-area-inset-bottom)); 
-            transform: translate(-50%, 20px); padding: 12px 24px; font-size: 1.2rem; font-weight: 300; gap: 15px;
-        }
-        #price-pill.show { opacity: 1; transform: translate(-50%, 0); }
-        #coin-pill { 
-            top: calc(10% + env(safe-area-inset-top)); 
-            transform: translate(-50%, -20px); padding: 8px 20px; font-size: 1rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase;
-        }
-        #coin-pill.show { opacity: 1; transform: translate(-50%, 0); }
 
     </style>
 </head>
 <body>
 
     <div id="grid-container">
-        <!-- I box verranno generati via JS -->
+        <!-- I box vengono generati via JS -->
         <!-- I resizer per il ridimensionamento fluido -->
-        <div class="resizer resizer-v"></div>
-        <div class="resizer resizer-v"></div>
+        <div class="resizer resizer-v" data-index="0"></div>
+        <div class="resizer resizer-v" data-index="1"></div>
         <div class="resizer resizer-h"></div>
-    </div>
-
-    <div id="coin-pill">BTC</div>
-    <div id="price-pill">
-        <span id="pill-price">-</span>
-        <span class="tf-label" id="pill-tf">4H</span>
     </div>
 
     <script>
@@ -193,24 +163,28 @@
         const BASE_URL = 'https://api.bitget.com';
         const gridContainer = document.getElementById('grid-container');
 
-        const TIMEFRAMES = ['1D', '4H', '1H', '12H', '15m', '30m'];
+        // Array di dati. L'ordine determina la posizione nella griglia.
+        let tfDataArray = ['1D', '4H', '1H', '12H', '15m', '30m'];
+        
         const GRANULARITY = {
             '15m': '15min', '30m': '30min', '1H': '1h',
             '4H': '4h', '12H': '12h', '1D': '1day'
         };
 
         const state = { activeTF: '4H', timeframes: {} };
-        TIMEFRAMES.forEach(tf => { state.timeframes[tf] = { trend: 'up', count: 0, price: '...' }; });
+        tfDataArray.forEach(tf => { state.timeframes[tf] = { trend: 'up', count: 0, price: '...' }; });
 
-        // --- RENDER GRIGLIA ---
+        // --- RENDER ---
         function initGrid() {
-            // Rimuoviamo i vecchi box ma lasciamo i resizer
+            // Rimuovi i vecchi box (mantieni i resizer)
             document.querySelectorAll('.box').forEach(b => b.remove());
 
-            TIMEFRAMES.forEach(tfKey => {
+            // Genera i box basandosi sull'array
+            tfDataArray.forEach((tfKey, index) => {
                 const box = document.createElement('div');
                 box.className = `box up`;
                 box.dataset.tf = tfKey;
+                box.dataset.index = index;
                 box.id = `box-${tfKey}`;
                 
                 box.innerHTML = `
@@ -221,19 +195,21 @@
                     </div>
                 `;
                 
-                // Inserisci prima dei resizer per non coprirli
+                // Inserisci prima dei resizer
                 gridContainer.insertBefore(box, gridContainer.firstChild);
             });
 
-            setupDraggable();
+            renderValues();
         }
 
-        function render() {
-            TIMEFRAMES.forEach(tfKey => {
+        function renderValues() {
+            tfDataArray.forEach(tfKey => {
                 const data = state.timeframes[tfKey];
-                const box = document.getElementById(`box-${tfKey}`);
                 const countEl = document.getElementById(`count-${tfKey}`);
                 const dotsEl = document.getElementById(`dots-${tfKey}`);
+                const box = document.getElementById(`box-${tfKey}`);
+
+                if (!box || !countEl) return;
 
                 box.classList.toggle('up', data.trend === 'up');
                 box.classList.toggle('down', data.trend === 'down');
@@ -286,247 +262,166 @@
         }
 
         async function updateAll() {
-            await Promise.all(TIMEFRAMES.map(tf => updateTimeframe(tf)));
-            render();
+            await Promise.all(tfDataArray.map(tf => updateTimeframe(tf)));
+            renderValues();
         }
 
         // --- LOGICA RESIZER (Split Panes) ---
-        function setupResizers() {
-            const resizersV = document.querySelectorAll('.resizer-v');
-            const resizerH = document.querySelector('.resizer-h');
-            const grid = document.getElementById('grid-container');
+        let resizingType = null;
+        let startX, startY;
+        let startCol1, startCol2, startRow1;
 
-            let startX, startY, startCol1, startCol2, startCol3, startRow1, startRow2;
-            let isResizing = false;
-            let currentResizer = null;
-
-            function startResize(e, resizer, type, index) {
-                isResizing = true;
-                currentResizer = { resizer, type, index };
+        document.querySelectorAll('.resizer-v').forEach(resizer => {
+            resizer.addEventListener('pointerdown', (e) => {
+                e.preventDefault();
+                resizingType = 'v';
+                resizer.dataset.active = resizer.dataset.index;
                 startX = e.clientX;
-                startY = e.clientY;
-
-                const computed = getComputedStyle(grid);
-                const cols = computed.gridTemplateColumns.split(' ').map(v => parseFloat(v));
-                const rows = computed.gridTemplateRows.split(' ').map(v => parseFloat(v));
                 
-                startCol1 = cols[0]; startCol2 = cols[1]; startCol3 = cols[2];
-                startRow1 = rows[0]; startRow2 = rows[1];
-
-                document.body.style.cursor = type === 'v' ? 'col-resize' : 'row-resize';
-                e.target.setPointerCapture(e.pointerId);
-            }
-
-            function doResize(e) {
-                if (!isResizing) return;
-
-                if (currentResizer.type === 'v') {
-                    const deltaX = e.clientX - startX;
-                    const totalWidth = startCol1 + startCol2 + startCol3;
-                    
-                    if (currentResizer.index === 0) {
-                        // Primo divisorio
-                        let newCol1 = Math.max(30, startCol1 + deltaX);
-                        let newCol2 = Math.max(30, startCol2 - deltaX);
-                        grid.style.setProperty('--col1', `${(newCol1 / totalWidth) * 100}%`);
-                        grid.style.setProperty('--col2', `${(newCol2 / totalWidth) * 100}%`);
-                        grid.style.setProperty('--col3', `${(startCol3 / totalWidth) * 100}%`);
-                    } else {
-                        // Secondo divisorio
-                        let newCol2 = Math.max(30, startCol2 + deltaX);
-                        let newCol3 = Math.max(30, startCol3 - deltaX);
-                        grid.style.setProperty('--col1', `${(startCol1 / totalWidth) * 100}%`);
-                        grid.style.setProperty('--col2', `${(newCol2 / totalWidth) * 100}%`);
-                        grid.style.setProperty('--col3', `${(newCol3 / totalWidth) * 100}%`);
-                    }
-                } else {
-                    // Orizzontale
-                    const deltaY = e.clientY - startY;
-                    const totalHeight = startRow1 + startRow2;
-                    let newRow1 = Math.max(40, startRow1 + deltaY);
-                    let newRow2 = Math.max(40, startRow2 - deltaY);
-                    grid.style.setProperty('--row1', `${(newRow1 / totalHeight) * 100}%`);
-                    grid.style.setProperty('--row2', `${(newRow2 / totalHeight) * 100}%`);
-                }
-            }
-
-            function endResize(e) {
-                isResizing = false;
-                document.body.style.cursor = 'default';
-                currentResizer = null;
-            }
-
-            resizersV[0].addEventListener('pointerdown', (e) => startResize(e, resizersV[0], 'v', 0));
-            resizersV[1].addEventListener('pointerdown', (e) => startResize(e, resizersV[1], 'v', 1));
-            resizerH.addEventListener('pointerdown', (e) => startResize(e, resizerH, 'h'));
-
-            document.addEventListener('pointermove', doResize);
-            document.addEventListener('pointerup', endResize);
-        }
-
-        // --- LOGICA DRAG & DROP (Scambio Box) ---
-        function setupDraggable() {
-            let draggedBox = null;
-            let pressTimer;
-            let startX, startY;
-            let isDragging = false;
-            let isFocusHold = false;
-
-            document.querySelectorAll('.box').forEach(box => {
-                box.addEventListener('pointerdown', (e) => {
-                    if (box.classList.contains('focus-mode')) {
-                        // Logica per uscire dal focus
-                        pressTimer = setTimeout(() => {
-                            box.classList.remove('focus-mode');
-                            if (navigator.vibrate) navigator.vibrate(30);
-                        }, 300);
-                        startX = e.clientX; startY = e.clientY;
-                        return;
-                    }
-
-                    startX = e.clientX; startY = e.clientY;
-                    isDragging = false;
-                    
-                    pressTimer = setTimeout(() => {
-                        isDragging = true;
-                        draggedBox = box;
-                        box.classList.add('dragging');
-                        if (navigator.vibrate) navigator.vibrate(20);
-                    }, 300);
-                });
-            });
-
-            document.addEventListener('pointermove', (e) => {
-                if (isDragging && draggedBox) {
-                    e.preventDefault();
-                    const element = document.elementFromPoint(e.clientX, e.clientY);
-                    const targetBox = element ? element.closest('.box') : null;
-                    
-                    document.querySelectorAll('.box').forEach(b => b.classList.remove('drag-over'));
-                    if (targetBox && targetBox !== draggedBox) {
-                        targetBox.classList.add('drag-over');
-                    }
-                } else {
-                    // Annulla timer se muove prima
-                    if (Math.abs(e.clientX - startX) > 10 || Math.abs(e.clientY - startY) > 10) {
-                        clearTimeout(pressTimer);
-                    }
-                }
-            });
-
-            document.addEventListener('pointerup', (e) => {
-                clearTimeout(pressTimer);
+                const style = getComputedStyle(gridContainer);
+                startCol1 = parseFloat(style.getPropertyValue('--c1')) || (window.innerWidth / 3);
+                startCol2 = parseFloat(style.getPropertyValue('--c2')) || (window.innerWidth / 3);
                 
-                if (isDragging && draggedBox) {
-                    const element = document.elementFromPoint(e.clientX, e.clientY);
-                    const targetBox = element ? element.closest('.box') : null;
-
-                    if (targetBox && targetBox !== draggedBox) {
-                        // SCAMBIO POSIZIONI (Swap Grid Area)
-                        const draggedTf = draggedBox.dataset.tf;
-                        const targetTf = targetBox.dataset.tf;
-                        
-                        // Swap dei contenuti HTML e dei dataset
-                        const tempHtml = draggedBox.innerHTML;
-                        const tempClass = draggedBox.className;
-                        const tempId = draggedBox.id;
-
-                        draggedBox.innerHTML = targetBox.innerHTML;
-                        draggedBox.className = targetBox.className;
-                        draggedBox.id = targetBox.id;
-                        draggedBox.dataset.tf = targetBox.dataset.tf;
-
-                        targetBox.innerHTML = tempHtml;
-                        targetBox.className = tempClass;
-                        targetBox.id = tempId;
-                        targetBox.dataset.tf = draggedTf;
-
-                        // Riassegna gli ID interni per far funzionare il render
-                        document.getElementById(`count-${targetBox.dataset.tf}`).id = `count-${targetBox.dataset.tf}`; 
-                        // (Semplificato: in un'app reale bisognerebbe aggiornare il DOM in modo più pulito, 
-                        // ma qui manteniamo la logica semplice scambiando i nodi)
-                    }
-                    
-                    draggedBox.classList.remove('dragging');
-                    document.querySelectorAll('.box').forEach(b => b.classList.remove('drag-over'));
-                    draggedBox = null;
-                    isDragging = false;
-                    render(); // Aggiorna i colori
-                    
-                } else if (!isDragging) {
-                    // TAP SINGOLO: Vai in Focus
-                    const box = e.target.closest('.box');
-                    if (box) {
-                        if (box.classList.contains('focus-mode')) {
-                            // Se era già in focus, esci (se non è partito il timer)
-                            const delta = Math.abs(e.clientX - startX) + Math.abs(e.clientY - startY);
-                            if (delta < 10) box.classList.remove('focus-mode');
-                        } else {
-                            // Attiva Focus
-                            box.classList.add('focus-mode');
-                            state.activeTF = box.dataset.tf;
-                            
-                            // Mostra prezzo in focus
-                            showPriceAndCoin(state.activeTF);
-                        }
-                    }
-                }
+                resizer.setPointerCapture(e.pointerId);
             });
-        }
+        });
 
-        // --- ALTRE FUNZIONI (Swipe Coin, ecc) ---
-        // Swipe up/down per cambiare coin
-        let touchStartY = 0;
-        window.addEventListener('touchstart', (e) => {
-            if (document.querySelector('.focus-mode')) return;
-            touchStartY = e.touches[0].clientY;
-        }, { passive: false });
+        document.querySelector('.resizer-h').addEventListener('pointerdown', (e) => {
+            e.preventDefault();
+            resizingType = 'h';
+            startY = e.clientY;
+            
+            const style = getComputedStyle(gridContainer);
+            startRow1 = parseFloat(style.getPropertyValue('--r1')) || (window.innerHeight / 2);
+            
+            e.target.setPointerCapture(e.pointerId);
+        });
 
-        window.addEventListener('touchend', (e) => {
-            if (document.querySelector('.focus-mode')) return;
-            const deltaY = e.changedTouches[0].clientY - touchStartY;
-            if (deltaY > 60) changeCoin();
-            else if (deltaY < -60) {
-                const activeBox = document.querySelector('.box');
-                if (activeBox) showPriceAndCoin(activeBox.dataset.tf);
+        document.addEventListener('pointermove', (e) => {
+            if (!resizingType) return;
+            
+            if (resizingType === 'v') {
+                const activeIndex = document.querySelector('.resizer-v[data-active]')?.dataset.active;
+                if (activeIndex === undefined) return;
+
+                const deltaX = e.clientX - startX;
+                const totalWidth = window.innerWidth;
+                
+                if (activeIndex === "0") {
+                    let newC1 = startCol1 + deltaX;
+                    // Limiti min/max
+                    if (newC1 < 80) newC1 = 80;
+                    if (newC1 > totalWidth - 160) newC1 = totalWidth - 160;
+                    gridContainer.style.setProperty('--c1', `${(newC1 / totalWidth) * 100}%`);
+                } else {
+                    let newC2 = startCol2 + deltaX;
+                    const c1Px = (parseFloat(getComputedStyle(gridContainer).getPropertyValue('--c1')) / 100) * totalWidth;
+                    if (newC2 < 80) newC2 = 80;
+                    if (c1Px + newC2 > totalWidth - 80) newC2 = totalWidth - c1Px - 80;
+                    gridContainer.style.setProperty('--c2', `${(newC2 / totalWidth) * 100}%`);
+                }
+            } else if (resizingType === 'h') {
+                const deltaY = e.clientY - startY;
+                const totalHeight = window.innerHeight;
+                let newR1 = startRow1 + deltaY;
+                
+                if (newR1 < 100) newR1 = 100;
+                if (newR1 > totalHeight - 100) newR1 = totalHeight - 100;
+                gridContainer.style.setProperty('--r1', `${(newR1 / totalHeight) * 100}%`);
             }
         });
 
-        function changeCoin() {
-            if (navigator.vibrate) navigator.vibrate([30, 50, 30]);
-            gridContainer.style.opacity = '0.5';
-            activeCoinIndex = (activeCoinIndex + 1) % COINS.length;
-            SYMBOL = COINS[activeCoinIndex];
-            document.getElementById('coin-pill').textContent = SYMBOL.replace('USDT', '');
-            document.getElementById('coin-pill').classList.add('show');
-            
-            updateAll().then(() => {
-                gridContainer.style.opacity = '1';
-                setTimeout(() => document.getElementById('coin-pill').classList.remove('show'), 2000);
-            });
-        }
+        document.addEventListener('pointerup', () => {
+            resizingType = null;
+            document.querySelectorAll('.resizer-v').forEach(r => delete r.dataset.active);
+        });
 
-        function showPriceAndCoin(tfKey) {
-            if (navigator.vibrate) navigator.vibrate(20);
-            const tf = state.timeframes[tfKey];
-            if (!tf) return;
-            const pricePill = document.getElementById('price-pill');
-            document.getElementById('pill-price').textContent = tf.price;
-            document.getElementById('pill-tf').textContent = tfKey;
-            document.getElementById('coin-pill').textContent = SYMBOL.replace('USDT', '');
+        // --- LOGICA DRAG & DROP (Swap) ---
+        let draggedBox = null;
+        let pressTimer;
+        let startPos = { x: 0, y: 0 };
+        let isDragging = false;
+
+        document.addEventListener('pointerdown', (e) => {
+            const box = e.target.closest('.box');
+            if (!box) return;
+
+            // Se il box è in focus mode, gestiamo il click per uscire
+            if (box.classList.contains('focus-mode')) {
+                startPos = { x: e.clientX, y: e.clientY };
+                return;
+            }
+
+            startPos = { x: e.clientX, y: e.clientY };
+            isDragging = false;
             
-            pricePill.classList.add('show');
-            document.getElementById('coin-pill').classList.add('show');
-            
-            setTimeout(() => {
-                pricePill.classList.remove('show');
-                document.getElementById('coin-pill').classList.remove('show');
-            }, 3000);
-        }
+            pressTimer = setTimeout(() => {
+                isDragging = true;
+                draggedBox = box;
+                box.classList.add('dragging');
+                if (navigator.vibrate) navigator.vibrate(20);
+            }, 300);
+        });
+
+        document.addEventListener('pointermove', (e) => {
+            // Se l'utente muove il dito prima del timer, annulla il drag
+            if (!isDragging && pressTimer) {
+                const dist = Math.abs(e.clientX - startPos.x) + Math.abs(e.clientY - startPos.y);
+                if (dist > 10) clearTimeout(pressTimer);
+                return;
+            }
+
+            if (isDragging && draggedBox) {
+                e.preventDefault();
+                const element = document.elementFromPoint(e.clientX, e.clientY);
+                const targetBox = element ? element.closest('.box') : null;
+                
+                document.querySelectorAll('.box').forEach(b => b.classList.remove('drag-over'));
+                if (targetBox && targetBox !== draggedBox) {
+                    targetBox.classList.add('drag-over');
+                }
+            }
+        });
+
+        document.addEventListener('pointerup', (e) => {
+            clearTimeout(pressTimer);
+
+            if (isDragging && draggedBox) {
+                const element = document.elementFromPoint(e.clientX, e.clientY);
+                const targetBox = element ? element.closest('.box') : null;
+
+                if (targetBox && targetBox !== draggedBox) {
+                    // Logica di SWAP basata sull'array di dati (Super Sicura)
+                    const indexA = parseInt(draggedBox.dataset.index);
+                    const indexB = parseInt(targetBox.dataset.index);
+                    
+                    const temp = tfDataArray[indexA];
+                    tfDataArray[indexA] = tfDataArray[indexB];
+                    tfDataArray[indexB] = temp;
+
+                    initGrid(); // Ridisegna la griglia nell'ordine corretto
+                }
+                
+                draggedBox.classList.remove('dragging');
+                document.querySelectorAll('.box').forEach(b => b.classList.remove('drag-over'));
+                draggedBox = null;
+                isDragging = false;
+                
+            } else if (!isDragging) {
+                // TAP LOGIC
+                const box = e.target.closest('.box');
+                if (box) {
+                    const dist = Math.abs(e.clientX - startPos.x) + Math.abs(e.clientY - startPos.y);
+                    if (dist < 10) {
+                        box.classList.toggle('focus-mode');
+                        if (navigator.vibrate) navigator.vibrate(10);
+                    }
+                }
+            }
+        });
 
         // --- INIZIO ---
         initGrid();
-        setupResizers();
         updateAll();
         setInterval(updateAll, 15000);
     </script>
