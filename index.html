@@ -6,8 +6,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#000000">
-    
-    <title>MondrianMarket</title>
+    <title>MondrianMarket · Fluid Grid</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@200;400;600&display=swap');
 
@@ -24,108 +23,130 @@
             color: #F0F0F0;
         }
 
-        #app-container {
-            width: 100%; 
-            height: 100%; 
+        /* --- GRIGLIA FLUIDA --- */
+        #grid-container {
+            display: grid;
+            /* Usiamo le frazioni (fr) per far adattare i box in modo proporzionale */
+            grid-template-columns: var(--col1, 1fr) var(--col2, 1fr) var(--col3, 1fr);
+            grid-template-rows: var(--row1, 1fr) var(--row2, 1fr);
+            width: 100%;
+            height: 100%;
+            gap: 3px; /* Linee Mondrian */
+            background-color: #000; /* Colore delle linee */
             position: relative;
-            overflow: hidden;
-            transition: opacity 0.3s ease;
-            /* NESSUN PADDING QUI: La griglia deve riempire tutto lo schermo */
-            padding: 0; 
         }
 
-        /* --- BOX DEI TIMEFRAME --- */
         .box {
-            position: absolute;
+            position: relative;
+            background-color: #0B1B2B; /* Default Up */
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            background-color: #0B1B2B;
-            border: 3px solid #000; /* Linee Mondrian */
-            box-shadow: inset 0 0 0 1px rgba(255,255,255,0.05);
-            transition: left 0.4s cubic-bezier(0.16, 1, 0.3, 1), 
-                        top 0.4s cubic-bezier(0.16, 1, 0.3, 1), 
-                        width 0.4s cubic-bezier(0.16, 1, 0.3, 1), 
-                        height 0.4s cubic-bezier(0.16, 1, 0.3, 1),
-                        background-color 0.5s ease;
+            transition: background-color 0.5s ease, transform 0.3s ease, opacity 0.3s ease;
             overflow: hidden;
-        }
-
-        .box.dragging {
-            transition: background-color 0.5s ease;
-            z-index: 100;
-            opacity: 0.9;
-            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+            z-index: 1;
         }
 
         .box.up { background-color: #0B1B2B; }
         .box.down { background-color: #2B0B0B; }
         
-        .box.selected { border: 3px solid #F7D117; }
-
-        /* Modalità Focus (Schermo Intero) */
+        /* Modalità Focus a schermo intero */
         .box.focus-mode {
-            top: 0 !important;
-            left: 0 !important;
-            width: 100% !important;
-            height: 100% !important;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 100;
             border: none;
-            border-radius: 0;
+            transform: scale(1);
+        }
+
+        /* Animazione Drag & Drop (Swap) */
+        .box.dragging {
+            opacity: 0.5;
+            transform: scale(0.95);
             z-index: 50;
         }
-        
-        #app-container.has-focus .box:not(.focus-mode) {
-            opacity: 0;
-            pointer-events: none;
+        .box.drag-over {
+            border: 3px solid #F7D117;
+            z-index: 10;
         }
 
-        /* --- ELEMENTI INTERNI AI BOX (Qui mettiamo le safe area) --- */
+        /* --- CONTENUTI INTERNI (Safe Area iOS) --- */
+        /* Usiamo un wrapper interno per gestire la safe area senza interrompere il colore */
+        .box-content {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            height: 100%;
+            pointer-events: none; /* I click passano al box genitore */
+        }
+
+        /* Push del testo in alto per i box della prima riga */
+        .box:nth-child(1) .box-content,
+        .box:nth-child(2) .box-content,
+        .box:nth-child(3) .box-content {
+            padding-top: env(safe-area-inset-top);
+        }
+
+        /* Push del testo in basso per i box della seconda riga */
+        .box:nth-child(4) .box-content,
+        .box:nth-child(5) .box-content,
+        .box:nth-child(6) .box-content {
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+
+        /* Fix per il focus mode (occupa tutto lo schermo, quindi gestiamo entrambe le safe area) */
+        .box.focus-mode .box-content {
+            padding-top: env(safe-area-inset-top);
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+
         .tf-label {
             position: absolute; 
-            /* Spostiamo il testo in basso per non farlo finire sotto la Dynamic Island */
-            top: calc(15px + env(safe-area-inset-top)); 
-            left: calc(15px + env(safe-area-inset-left));
+            top: 10px; 
+            left: 10px;
             font-size: 0.8rem; font-weight: 600;
             color: rgba(255,255,255,0.4);
-            letter-spacing: 0.1em; pointer-events: none;
+            letter-spacing: 0.1em;
         }
         
-        .box.focus-mode .tf-label { 
-            top: calc(40px + env(safe-area-inset-top)); 
-            left: calc(40px + env(safe-area-inset-left)); 
-            font-size: 1.2rem; 
-        }
-
         .tf-count {
             font-size: 3rem; font-weight: 200; line-height: 1;
-            text-shadow: 0 5px 15px rgba(0,0,0,0.3); pointer-events: none;
+            text-shadow: 0 5px 15px rgba(0,0,0,0.3);
         }
         .box.focus-mode .tf-count { font-size: 10rem; }
 
-        .tf-dots { display: flex; gap: 6px; margin-top: 10px; pointer-events: none; }
-        .box.focus-mode .tf-dots { gap: 15px; margin-top: 20px; }
+        .tf-dots { display: flex; gap: 6px; margin-top: 10px; }
         .dot { width: 10px; height: 10px; border-radius: 50%; background-color: #E0E0E0; }
-        .box.focus-mode .dot { width: 20px; height: 20px; }
 
-        /* Maniglia per il Resize */
-        .resize-handle {
-            position: absolute; 
-            bottom: env(safe-area-inset-bottom); 
-            right: env(safe-area-inset-right);
-            width: 40px; height: 40px; 
-            cursor: se-resize; z-index: 20;
-            display: flex; justify-content: flex-end; align-items: flex-end;
-            padding: 10px;
+        /* --- RESIZER DIVIDERS (Linee invisibili per ridimensionare) --- */
+        .resizer {
+            position: absolute;
+            background: transparent;
+            z-index: 20;
         }
-        .resize-handle::after {
-            content: ""; width: 12px; height: 12px;
-            border-right: 2px solid rgba(255,255,255,0.3);
-            border-bottom: 2px solid rgba(255,255,255,0.3);
+        /* Verticali (tra colonna 1-2 e 2-3) */
+        .resizer-v {
+            width: 20px;
+            height: 100%;
+            cursor: col-resize;
+            top: 0;
         }
-        .box.focus-mode .resize-handle { display: none; }
+        .resizer-v:nth-of-type(1) { left: calc(33.33% - 10px); }
+        .resizer-v:nth-of-type(2) { left: calc(66.66% - 10px); }
 
-        /* --- PILLOLE FLUTTUANTI --- */
+        /* Orizzontale (tra riga 1 e 2) */
+        .resizer-h {
+            height: 20px;
+            width: 100%;
+            cursor: row-resize;
+            left: 0;
+            top: calc(50% - 10px);
+        }
+
+        /* --- PILLOLE --- */
         #price-pill, #coin-pill {
             position: absolute; left: 50%;
             background: rgba(20, 20, 20, 0.8);
@@ -134,21 +155,16 @@
             border-radius: 50px;
             display: flex; align-items: center;
             opacity: 0; transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-            z-index: 100; pointer-events: none;
+            z-index: 200; pointer-events: none;
         }
-        
         #price-pill { 
             bottom: calc(10% + env(safe-area-inset-bottom)); 
-            transform: translate(-50%, 20px); 
-            padding: 12px 24px; font-size: 1.2rem; font-weight: 300; gap: 15px;
+            transform: translate(-50%, 20px); padding: 12px 24px; font-size: 1.2rem; font-weight: 300; gap: 15px;
         }
         #price-pill.show { opacity: 1; transform: translate(-50%, 0); }
-        #price-pill .tf-label { position: static; font-size: 0.8rem; color: #aaa; }
-        
         #coin-pill { 
             top: calc(10% + env(safe-area-inset-top)); 
-            transform: translate(-50%, -20px); 
-            padding: 8px 20px; font-size: 1rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase;
+            transform: translate(-50%, -20px); padding: 8px 20px; font-size: 1rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase;
         }
         #coin-pill.show { opacity: 1; transform: translate(-50%, 0); }
 
@@ -156,12 +172,18 @@
 </head>
 <body>
 
-    <div id="app-container">
-        <div id="coin-pill">BTC</div>
-        <div id="price-pill">
-            <span id="pill-price">-</span>
-            <span class="tf-label" id="pill-tf">4H</span>
-        </div>
+    <div id="grid-container">
+        <!-- I box verranno generati via JS -->
+        <!-- I resizer per il ridimensionamento fluido -->
+        <div class="resizer resizer-v"></div>
+        <div class="resizer resizer-v"></div>
+        <div class="resizer resizer-h"></div>
+    </div>
+
+    <div id="coin-pill">BTC</div>
+    <div id="price-pill">
+        <span id="pill-price">-</span>
+        <span class="tf-label" id="pill-tf">4H</span>
     </div>
 
     <script>
@@ -169,61 +191,45 @@
         let activeCoinIndex = 0;
         let SYMBOL = COINS[activeCoinIndex];
         const BASE_URL = 'https://api.bitget.com';
-        const appContainer = document.getElementById('app-container');
+        const gridContainer = document.getElementById('grid-container');
 
-        const initialLayout = {
-            '1D':  { x: 0, y: 0, w: 40, h: 60 },
-            '4H':  { x: 65, y: 0, w: 35, h: 100 },
-            '1H':  { x: 40, y: 0, w: 25, h: 40 },
-            '12H': { x: 40, y: 40, w: 25, h: 20 },
-            '15m': { x: 0, y: 60, w: 40, h: 40 },
-            '30m': { x: 40, y: 60, w: 25, h: 40 }
-        };
-
-        let layout = JSON.parse(localStorage.getItem('mondrian_layout_auto')) || initialLayout;
-
-        const TIMEFRAMES = {
-            '15m': { granularity: '15min' },
-            '30m': { granularity: '30min' },
-            '1H':  { granularity: '1h'    },
-            '4H':  { granularity: '4h'    },
-            '12H': { granularity: '12h'   },
-            '1D':  { granularity: '1day'  }
+        const TIMEFRAMES = ['1D', '4H', '1H', '12H', '15m', '30m'];
+        const GRANULARITY = {
+            '15m': '15min', '30m': '30min', '1H': '1h',
+            '4H': '4h', '12H': '12h', '1D': '1day'
         };
 
         const state = { activeTF: '4H', timeframes: {} };
-        Object.keys(TIMEFRAMES).forEach(tf => { state.timeframes[tf] = { trend: 'up', count: 0, price: '...' }; });
+        TIMEFRAMES.forEach(tf => { state.timeframes[tf] = { trend: 'up', count: 0, price: '...' }; });
 
+        // --- RENDER GRIGLIA ---
         function initGrid() {
-            Object.keys(TIMEFRAMES).forEach(tfKey => {
+            // Rimuoviamo i vecchi box ma lasciamo i resizer
+            document.querySelectorAll('.box').forEach(b => b.remove());
+
+            TIMEFRAMES.forEach(tfKey => {
                 const box = document.createElement('div');
                 box.className = `box up`;
                 box.dataset.tf = tfKey;
                 box.id = `box-${tfKey}`;
                 
-                applyBoxLayout(box, tfKey);
-
                 box.innerHTML = `
-                    <div class="tf-label">${tfKey}</div>
-                    <div class="tf-count" id="count-${tfKey}">-</div>
-                    <div class="tf-dots" id="dots-${tfKey}" style="display:none;"></div>
-                    <div class="resize-handle" data-resize="${tfKey}"></div>
+                    <div class="box-content">
+                        <div class="tf-label">${tfKey}</div>
+                        <div class="tf-count" id="count-${tfKey}">-</div>
+                        <div class="tf-dots" id="dots-${tfKey}" style="display:none;"></div>
+                    </div>
                 `;
-                appContainer.appendChild(box);
+                
+                // Inserisci prima dei resizer per non coprirli
+                gridContainer.insertBefore(box, gridContainer.firstChild);
             });
-        }
 
-        function applyBoxLayout(el, tfKey) {
-            const l = layout[tfKey];
-            // Usa semplici percentuali perché il container ora è full-screen
-            el.style.left = `${l.x}%`;
-            el.style.top = `${l.y}%`;
-            el.style.width = `${l.w}%`;
-            el.style.height = `${l.h}%`;
+            setupDraggable();
         }
 
         function render() {
-            Object.keys(TIMEFRAMES).forEach(tfKey => {
+            TIMEFRAMES.forEach(tfKey => {
                 const data = state.timeframes[tfKey];
                 const box = document.getElementById(`box-${tfKey}`);
                 const countEl = document.getElementById(`count-${tfKey}`);
@@ -241,47 +247,10 @@
                     dotsEl.style.display = 'flex';
                     dotsEl.innerHTML = '<div class="dot"></div>'.repeat(5);
                 }
-
-                box.classList.toggle('selected', tfKey === state.activeTF);
             });
         }
 
-        function resolveCollisions(movedKey) {
-            const movedBox = layout[movedKey];
-            const movedCenterX = movedBox.x + (movedBox.w / 2);
-            const movedCenterY = movedBox.y + (movedBox.h / 2);
-
-            let collidedKey = null;
-
-            Object.keys(layout).forEach(key => {
-                if (key === movedKey) return;
-                const box = layout[key];
-                if (
-                    movedCenterX >= box.x && movedCenterX <= (box.x + box.w) &&
-                    movedCenterY >= box.y && movedCenterY <= (box.y + box.h)
-                ) {
-                    collidedKey = key;
-                }
-            });
-
-            if (collidedKey) {
-                const temp = { ...layout[collidedKey] };
-                layout[collidedKey] = { ...layout[movedKey] };
-                layout[movedKey] = temp;
-
-                applyBoxLayout(document.getElementById(`box-${movedKey}`), movedKey);
-                applyBoxLayout(document.getElementById(`box-${collidedKey}`), collidedKey);
-                
-                if (navigator.vibrate) navigator.vibrate([20, 30, 20]);
-            } else {
-                const rect = document.getElementById(`box-${movedKey}`).getBoundingClientRect();
-                layout[movedKey].x = (rect.left / window.innerWidth) * 100;
-                layout[movedKey].y = (rect.top / window.innerHeight) * 100;
-            }
-
-            localStorage.setItem('mondrian_layout_auto', JSON.stringify(layout));
-        }
-
+        // --- API BITGET ---
         async function fetchCandles(granularity) {
             const url = `${BASE_URL}/api/v2/spot/market/candles?symbol=${SYMBOL}&granularity=${granularity}&limit=10`;
             const res = await fetch(url);
@@ -308,7 +277,7 @@
 
         async function updateTimeframe(tfKey) {
             try {
-                const candles = await fetchCandles(TIMEFRAMES[tfKey].granularity);
+                const candles = await fetchCandles(GRANULARITY[tfKey]);
                 const { trend, count } = calculateStreak(candles);
                 let price = parseFloat(candles[candles.length - 1][4]);
                 let priceStr = price > 1000 ? price.toFixed(2) : price.toFixed(4);
@@ -317,162 +286,222 @@
         }
 
         async function updateAll() {
-            await Promise.all(Object.keys(TIMEFRAMES).map(tf => updateTimeframe(tf)));
+            await Promise.all(TIMEFRAMES.map(tf => updateTimeframe(tf)));
             render();
         }
 
-        // --- GESTIONE INTERAZIONI (Invariata) ---
-        let action = null;
-        let currentTarget = null;
-        let startX = 0, startY = 0;
-        let startW = 0, startH = 0;
-        let startLeft = 0, startTop = 0;
-        let pressTimer;
-        let hasMoved = false;
+        // --- LOGICA RESIZER (Split Panes) ---
+        function setupResizers() {
+            const resizersV = document.querySelectorAll('.resizer-v');
+            const resizerH = document.querySelector('.resizer-h');
+            const grid = document.getElementById('grid-container');
 
-        appContainer.addEventListener('pointerdown', (e) => {
-            const box = e.target.closest('.box');
-            if (!box) return;
+            let startX, startY, startCol1, startCol2, startCol3, startRow1, startRow2;
+            let isResizing = false;
+            let currentResizer = null;
 
-            currentTarget = box;
-            startX = e.clientX; startY = e.clientY;
-            hasMoved = false;
+            function startResize(e, resizer, type, index) {
+                isResizing = true;
+                currentResizer = { resizer, type, index };
+                startX = e.clientX;
+                startY = e.clientY;
 
-            if (!box.classList.contains('focus-mode')) {
-                const isResize = e.target.classList.contains('resize-handle');
+                const computed = getComputedStyle(grid);
+                const cols = computed.gridTemplateColumns.split(' ').map(v => parseFloat(v));
+                const rows = computed.gridTemplateRows.split(' ').map(v => parseFloat(v));
                 
-                if (isResize) {
-                    action = 'resize';
-                    startW = box.offsetWidth;
-                    startH = box.offsetHeight;
-                } else {
-                    action = 'drag';
-                    const rect = box.getBoundingClientRect();
-                    startLeft = rect.left;
-                    startTop = rect.top;
-                    box.classList.add('dragging');
+                startCol1 = cols[0]; startCol2 = cols[1]; startCol3 = cols[2];
+                startRow1 = rows[0]; startRow2 = rows[1];
+
+                document.body.style.cursor = type === 'v' ? 'col-resize' : 'row-resize';
+                e.target.setPointerCapture(e.pointerId);
+            }
+
+            function doResize(e) {
+                if (!isResizing) return;
+
+                if (currentResizer.type === 'v') {
+                    const deltaX = e.clientX - startX;
+                    const totalWidth = startCol1 + startCol2 + startCol3;
                     
-                    pressTimer = setTimeout(() => {
-                        if (!hasMoved) {
-                            action = 'longpress';
-                            if (navigator.vibrate) navigator.vibrate(20);
-                        }
-                    }, 300);
-                }
-            } else {
-                action = 'focus-hold';
-                pressTimer = setTimeout(() => {
-                    if (!hasMoved) {
-                        exitFocus();
-                        if (navigator.vibrate) navigator.vibrate(30);
+                    if (currentResizer.index === 0) {
+                        // Primo divisorio
+                        let newCol1 = Math.max(30, startCol1 + deltaX);
+                        let newCol2 = Math.max(30, startCol2 - deltaX);
+                        grid.style.setProperty('--col1', `${(newCol1 / totalWidth) * 100}%`);
+                        grid.style.setProperty('--col2', `${(newCol2 / totalWidth) * 100}%`);
+                        grid.style.setProperty('--col3', `${(startCol3 / totalWidth) * 100}%`);
+                    } else {
+                        // Secondo divisorio
+                        let newCol2 = Math.max(30, startCol2 + deltaX);
+                        let newCol3 = Math.max(30, startCol3 - deltaX);
+                        grid.style.setProperty('--col1', `${(startCol1 / totalWidth) * 100}%`);
+                        grid.style.setProperty('--col2', `${(newCol2 / totalWidth) * 100}%`);
+                        grid.style.setProperty('--col3', `${(newCol3 / totalWidth) * 100}%`);
                     }
-                }, 300);
-            }
-
-            box.setPointerCapture(e.pointerId);
-        });
-
-        appContainer.addEventListener('pointermove', (e) => {
-            if (!currentTarget) return;
-
-            const deltaX = e.clientX - startX;
-            const deltaY = e.clientY - startY;
-            
-            if (Math.abs(deltaX) > 5 || Math.abs(deltaY) > 5) {
-                hasMoved = true;
-                clearTimeout(pressTimer);
-            }
-
-            if (action === 'drag') {
-                let newLeft = startLeft + deltaX;
-                let newTop = startTop + deltaY;
-                currentTarget.style.left = `${newLeft}px`;
-                currentTarget.style.top = `${newTop}px`;
-
-            } else if (action === 'resize') {
-                let newW = startW + deltaX;
-                let newH = startH + deltaY;
-                newW = Math.max(60, newW); newH = Math.max(60, newH);
-                currentTarget.style.width = `${newW}px`;
-                currentTarget.style.height = `${newH}px`;
-            }
-        });
-
-        appContainer.addEventListener('pointerup', (e) => {
-            clearTimeout(pressTimer);
-            if (!currentTarget) return;
-
-            if (action === 'drag' && hasMoved) {
-                currentTarget.classList.remove('dragging');
-                const tf = currentTarget.dataset.tf;
-                
-                const rect = currentTarget.getBoundingClientRect();
-                layout[tf] = {
-                    x: (rect.left / window.innerWidth) * 100,
-                    y: (rect.top / window.innerHeight) * 100,
-                    w: (rect.width / window.innerWidth) * 100,
-                    h: (rect.height / window.innerHeight) * 100
-                };
-                
-                resolveCollisions(tf);
-
-            } else if (action === 'resize' && hasMoved) {
-                const tf = currentTarget.dataset.tf;
-                const rect = currentTarget.getBoundingClientRect();
-                layout[tf].w = (rect.width / window.innerWidth) * 100;
-                layout[tf].h = (rect.height / window.innerHeight) * 100;
-                localStorage.setItem('mondrian_layout_auto', JSON.stringify(layout));
-                applyBoxLayout(currentTarget, tf);
-
-            } else if (action === 'drag' && !hasMoved) {
-                const tf = currentTarget.dataset.tf;
-                if (state.activeTF === tf) {
-                    showPriceAndCoin(tf);
                 } else {
-                    state.activeTF = tf;
-                    render();
+                    // Orizzontale
+                    const deltaY = e.clientY - startY;
+                    const totalHeight = startRow1 + startRow2;
+                    let newRow1 = Math.max(40, startRow1 + deltaY);
+                    let newRow2 = Math.max(40, startRow2 - deltaY);
+                    grid.style.setProperty('--row1', `${(newRow1 / totalHeight) * 100}%`);
+                    grid.style.setProperty('--row2', `${(newRow2 / totalHeight) * 100}%`);
                 }
-                
-                appContainer.classList.add('has-focus');
-                currentTarget.classList.add('focus-mode');
-
             }
 
-            if (action !== 'focus-hold') currentTarget.classList.remove('dragging');
-            action = null;
-            currentTarget = null;
-        });
+            function endResize(e) {
+                isResizing = false;
+                document.body.style.cursor = 'default';
+                currentResizer = null;
+            }
 
-        function exitFocus() {
-            appContainer.classList.remove('has-focus');
-            document.querySelectorAll('.box').forEach(b => b.classList.remove('focus-mode'));
-            // Forza il ricalcolo del layout per iOS
-            setTimeout(() => { Object.keys(TIMEFRAMES).forEach(tf => applyBoxLayout(document.getElementById(`box-${tf}`), tf)); }, 50);
+            resizersV[0].addEventListener('pointerdown', (e) => startResize(e, resizersV[0], 'v', 0));
+            resizersV[1].addEventListener('pointerdown', (e) => startResize(e, resizersV[1], 'v', 1));
+            resizerH.addEventListener('pointerdown', (e) => startResize(e, resizerH, 'h'));
+
+            document.addEventListener('pointermove', doResize);
+            document.addEventListener('pointerup', endResize);
         }
 
-        appContainer.addEventListener('touchstart', (e) => {
-            if (appContainer.classList.contains('has-focus') || action) return;
-            startY = e.touches[0].clientY;
+        // --- LOGICA DRAG & DROP (Scambio Box) ---
+        function setupDraggable() {
+            let draggedBox = null;
+            let pressTimer;
+            let startX, startY;
+            let isDragging = false;
+            let isFocusHold = false;
+
+            document.querySelectorAll('.box').forEach(box => {
+                box.addEventListener('pointerdown', (e) => {
+                    if (box.classList.contains('focus-mode')) {
+                        // Logica per uscire dal focus
+                        pressTimer = setTimeout(() => {
+                            box.classList.remove('focus-mode');
+                            if (navigator.vibrate) navigator.vibrate(30);
+                        }, 300);
+                        startX = e.clientX; startY = e.clientY;
+                        return;
+                    }
+
+                    startX = e.clientX; startY = e.clientY;
+                    isDragging = false;
+                    
+                    pressTimer = setTimeout(() => {
+                        isDragging = true;
+                        draggedBox = box;
+                        box.classList.add('dragging');
+                        if (navigator.vibrate) navigator.vibrate(20);
+                    }, 300);
+                });
+            });
+
+            document.addEventListener('pointermove', (e) => {
+                if (isDragging && draggedBox) {
+                    e.preventDefault();
+                    const element = document.elementFromPoint(e.clientX, e.clientY);
+                    const targetBox = element ? element.closest('.box') : null;
+                    
+                    document.querySelectorAll('.box').forEach(b => b.classList.remove('drag-over'));
+                    if (targetBox && targetBox !== draggedBox) {
+                        targetBox.classList.add('drag-over');
+                    }
+                } else {
+                    // Annulla timer se muove prima
+                    if (Math.abs(e.clientX - startX) > 10 || Math.abs(e.clientY - startY) > 10) {
+                        clearTimeout(pressTimer);
+                    }
+                }
+            });
+
+            document.addEventListener('pointerup', (e) => {
+                clearTimeout(pressTimer);
+                
+                if (isDragging && draggedBox) {
+                    const element = document.elementFromPoint(e.clientX, e.clientY);
+                    const targetBox = element ? element.closest('.box') : null;
+
+                    if (targetBox && targetBox !== draggedBox) {
+                        // SCAMBIO POSIZIONI (Swap Grid Area)
+                        const draggedTf = draggedBox.dataset.tf;
+                        const targetTf = targetBox.dataset.tf;
+                        
+                        // Swap dei contenuti HTML e dei dataset
+                        const tempHtml = draggedBox.innerHTML;
+                        const tempClass = draggedBox.className;
+                        const tempId = draggedBox.id;
+
+                        draggedBox.innerHTML = targetBox.innerHTML;
+                        draggedBox.className = targetBox.className;
+                        draggedBox.id = targetBox.id;
+                        draggedBox.dataset.tf = targetBox.dataset.tf;
+
+                        targetBox.innerHTML = tempHtml;
+                        targetBox.className = tempClass;
+                        targetBox.id = tempId;
+                        targetBox.dataset.tf = draggedTf;
+
+                        // Riassegna gli ID interni per far funzionare il render
+                        document.getElementById(`count-${targetBox.dataset.tf}`).id = `count-${targetBox.dataset.tf}`; 
+                        // (Semplificato: in un'app reale bisognerebbe aggiornare il DOM in modo più pulito, 
+                        // ma qui manteniamo la logica semplice scambiando i nodi)
+                    }
+                    
+                    draggedBox.classList.remove('dragging');
+                    document.querySelectorAll('.box').forEach(b => b.classList.remove('drag-over'));
+                    draggedBox = null;
+                    isDragging = false;
+                    render(); // Aggiorna i colori
+                    
+                } else if (!isDragging) {
+                    // TAP SINGOLO: Vai in Focus
+                    const box = e.target.closest('.box');
+                    if (box) {
+                        if (box.classList.contains('focus-mode')) {
+                            // Se era già in focus, esci (se non è partito il timer)
+                            const delta = Math.abs(e.clientX - startX) + Math.abs(e.clientY - startY);
+                            if (delta < 10) box.classList.remove('focus-mode');
+                        } else {
+                            // Attiva Focus
+                            box.classList.add('focus-mode');
+                            state.activeTF = box.dataset.tf;
+                            
+                            // Mostra prezzo in focus
+                            showPriceAndCoin(state.activeTF);
+                        }
+                    }
+                }
+            });
+        }
+
+        // --- ALTRE FUNZIONI (Swipe Coin, ecc) ---
+        // Swipe up/down per cambiare coin
+        let touchStartY = 0;
+        window.addEventListener('touchstart', (e) => {
+            if (document.querySelector('.focus-mode')) return;
+            touchStartY = e.touches[0].clientY;
         }, { passive: false });
 
-        appContainer.addEventListener('touchend', (e) => {
-            if (appContainer.classList.contains('has-focus') || action) return;
-            const deltaY = e.changedTouches[0].clientY - startY;
-            
+        window.addEventListener('touchend', (e) => {
+            if (document.querySelector('.focus-mode')) return;
+            const deltaY = e.changedTouches[0].clientY - touchStartY;
             if (deltaY > 60) changeCoin();
-            else if (deltaY < -60) showPriceAndCoin(state.activeTF);
+            else if (deltaY < -60) {
+                const activeBox = document.querySelector('.box');
+                if (activeBox) showPriceAndCoin(activeBox.dataset.tf);
+            }
         });
 
         function changeCoin() {
             if (navigator.vibrate) navigator.vibrate([30, 50, 30]);
-            appContainer.style.opacity = '0.5';
+            gridContainer.style.opacity = '0.5';
             activeCoinIndex = (activeCoinIndex + 1) % COINS.length;
             SYMBOL = COINS[activeCoinIndex];
             document.getElementById('coin-pill').textContent = SYMBOL.replace('USDT', '');
             document.getElementById('coin-pill').classList.add('show');
             
             updateAll().then(() => {
-                appContainer.style.opacity = '1';
+                gridContainer.style.opacity = '1';
                 setTimeout(() => document.getElementById('coin-pill').classList.remove('show'), 2000);
             });
         }
@@ -480,6 +509,7 @@
         function showPriceAndCoin(tfKey) {
             if (navigator.vibrate) navigator.vibrate(20);
             const tf = state.timeframes[tfKey];
+            if (!tf) return;
             const pricePill = document.getElementById('price-pill');
             document.getElementById('pill-price').textContent = tf.price;
             document.getElementById('pill-tf').textContent = tfKey;
@@ -494,9 +524,11 @@
             }, 3000);
         }
 
+        // --- INIZIO ---
         initGrid();
+        setupResizers();
         updateAll();
-        setInterval(() => { if(!action) updateAll(); }, 15000);
+        setInterval(updateAll, 15000);
     </script>
 </body>
 </html>
