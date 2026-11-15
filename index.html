@@ -2,7 +2,13 @@
 <html lang="it">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <!-- OTTIMIZZAZIONE IOS: viewport-fit=cover è vitale per usare le safe area -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <!-- OTTIMIZZAZIONE IOS: Rende l'app standalone se salvata sulla home -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#000000">
+    
     <title>MondrianMarket</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@200;400;600&display=swap');
@@ -10,15 +16,30 @@
         * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; }
         
         body, html {
-            width: 100%; height: 100%; overflow: hidden;
+            width: 100%; 
+            /* OTTIMIZZAZIONE IOS: 100dvh risolve il problema della barra di Safari */
+            height: 100dvh; 
+            overflow: hidden;
+            /* OTTIMIZZAZIONE IOS: Blocca il rimbalzo della pagina */
+            overscroll-behavior: none; 
+            position: fixed;
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
             background-color: #000;
             color: #F0F0F0;
         }
 
         #app-container {
-            width: 100%; height: 100%; position: relative;
+            width: 100%; 
+            height: 100%; 
+            position: relative;
             overflow: hidden;
+            transition: opacity 0.3s ease;
+            
+            /* OTTIMIZZAZIONE IOS: Aggiunge il padding per la Dynamic Island e la barra in basso */
+            padding-top: env(safe-area-inset-top);
+            padding-bottom: env(safe-area-inset-bottom);
+            padding-left: env(safe-area-inset-left);
+            padding-right: env(safe-area-inset-right);
         }
 
         /* --- BOX DEI TIMEFRAME --- */
@@ -28,21 +49,31 @@
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            background-color: #0B1B2B; /* Default Up */
-            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-            overflow: hidden;
-            border: 3px solid #000; /* Linee Mondrian */
+            background-color: #0B1B2B;
+            border: 3px solid #000;
             box-shadow: inset 0 0 0 1px rgba(255,255,255,0.05);
-            /* Z-index verrà gestito in base al focus */
+            transition: left 0.4s cubic-bezier(0.16, 1, 0.3, 1), 
+                        top 0.4s cubic-bezier(0.16, 1, 0.3, 1), 
+                        width 0.4s cubic-bezier(0.16, 1, 0.3, 1), 
+                        height 0.4s cubic-bezier(0.16, 1, 0.3, 1),
+                        background-color 0.5s ease;
+            overflow: hidden;
+            /* Arrotonda leggermente gli angoli per un look iOS */
+            border-radius: 8px; 
+        }
+
+        .box.dragging {
+            transition: background-color 0.5s ease;
+            z-index: 100;
+            opacity: 0.9;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+            border-radius: 12px;
         }
 
         .box.up { background-color: #0B1B2B; }
         .box.down { background-color: #2B0B0B; }
         
-        .box.selected {
-            border: 3px solid #F7D117; /* Giallo Mondrian */
-            z-index: 10;
-        }
+        .box.selected { border: 3px solid #F7D117; }
 
         /* Modalità Focus (Schermo Intero) */
         .box.focus-mode {
@@ -55,57 +86,43 @@
             z-index: 50;
         }
         
-        /* Se un box è in focus, gli altri si nascondono */
         #app-container.has-focus .box:not(.focus-mode) {
             opacity: 0;
             pointer-events: none;
         }
 
         .tf-label {
-            position: absolute;
-            top: 15px; left: 15px;
+            position: absolute; top: 15px; left: 15px;
             font-size: 0.8rem; font-weight: 600;
             color: rgba(255,255,255,0.4);
-            letter-spacing: 0.1em;
-            pointer-events: none;
+            letter-spacing: 0.1em; pointer-events: none;
         }
-
-        .box.focus-mode .tf-label {
-            top: 40px; left: 40px; font-size: 1.2rem;
-        }
+        .box.focus-mode .tf-label { top: 40px; left: 40px; font-size: 1.2rem; }
 
         .tf-count {
             font-size: 3rem; font-weight: 200; line-height: 1;
-            text-shadow: 0 5px 15px rgba(0,0,0,0.3);
-            pointer-events: none;
+            text-shadow: 0 5px 15px rgba(0,0,0,0.3); pointer-events: none;
         }
-        
-        .box.focus-mode .tf-count {
-            font-size: 10rem;
-        }
+        .box.focus-mode .tf-count { font-size: 10rem; }
 
         .tf-dots { display: flex; gap: 6px; margin-top: 10px; pointer-events: none; }
         .box.focus-mode .tf-dots { gap: 15px; margin-top: 20px; }
         .dot { width: 10px; height: 10px; border-radius: 50%; background-color: #E0E0E0; }
         .box.focus-mode .dot { width: 20px; height: 20px; }
 
-        /* Maniglia per il Resize (In basso a destra) */
+        /* Maniglia per il Resize */
         .resize-handle {
-            position: absolute;
-            bottom: 0; right: 0;
-            width: 25px; height: 25px;
-            cursor: se-resize;
-            z-index: 20;
+            position: absolute; bottom: 0; right: 0;
+            width: 40px; height: 40px; /* Area di tocco più grande per iOS */
+            cursor: se-resize; z-index: 20;
             display: flex; justify-content: flex-end; align-items: flex-end;
-            padding: 5px;
+            padding: 10px;
         }
         .resize-handle::after {
-            content: "";
-            width: 10px; height: 10px;
-            border-right: 2px solid rgba(255,255,255,0.2);
-            border-bottom: 2px solid rgba(255,255,255,0.2);
+            content: ""; width: 12px; height: 12px;
+            border-right: 2px solid rgba(255,255,255,0.3);
+            border-bottom: 2px solid rgba(255,255,255,0.3);
         }
-
         .box.focus-mode .resize-handle { display: none; }
 
         /* --- PILLOLE --- */
@@ -119,12 +136,22 @@
             opacity: 0; transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
             z-index: 100; pointer-events: none;
         }
-
-        #price-pill { bottom: 10%; transform: translate(-50%, 20px); padding: 12px 24px; font-size: 1.2rem; font-weight: 300; gap: 15px;}
+        
+        #price-pill { 
+            /* Posizionato sopra la safe area in basso */
+            bottom: calc(10% + env(safe-area-inset-bottom)); 
+            transform: translate(-50%, 20px); 
+            padding: 12px 24px; font-size: 1.2rem; font-weight: 300; gap: 15px;
+        }
         #price-pill.show { opacity: 1; transform: translate(-50%, 0); }
         #price-pill .tf-label { position: static; font-size: 0.8rem; color: #aaa; }
-
-        #coin-pill { top: 10%; transform: translate(-50%, -20px); padding: 8px 20px; font-size: 1rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase;}
+        
+        #coin-pill { 
+            /* Posizionato sotto la safe area in alto */
+            top: calc(10% + env(safe-area-inset-top)); 
+            transform: translate(-50%, -20px); 
+            padding: 8px 20px; font-size: 1rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase;
+        }
         #coin-pill.show { opacity: 1; transform: translate(-50%, 0); }
 
     </style>
@@ -132,7 +159,6 @@
 <body>
 
     <div id="app-container">
-        <!-- I box vengono generati qui dal JS -->
         <div id="coin-pill">BTC</div>
         <div id="price-pill">
             <span id="pill-price">-</span>
@@ -147,9 +173,7 @@
         const BASE_URL = 'https://api.bitget.com';
         const appContainer = document.getElementById('app-container');
 
-        // Layout Iniziale (posizioni e dimensioni in percentuale)
-        // Proporzioni Mondrian predefinite
-        const defaultLayout = {
+        const initialLayout = {
             '1D':  { x: 0, y: 0, w: 40, h: 60 },
             '4H':  { x: 65, y: 0, w: 35, h: 100 },
             '1H':  { x: 40, y: 0, w: 25, h: 40 },
@@ -158,8 +182,7 @@
             '30m': { x: 40, y: 60, w: 25, h: 40 }
         };
 
-        // Carica layout da localStorage o usa il default
-        let layout = JSON.parse(localStorage.getItem('mondrian_layout')) || defaultLayout;
+        let layout = JSON.parse(localStorage.getItem('mondrian_layout_auto')) || initialLayout;
 
         const TIMEFRAMES = {
             '15m': { granularity: '15min' },
@@ -170,16 +193,9 @@
             '1D':  { granularity: '1day'  }
         };
 
-        const state = {
-            activeTF: '4H',
-            timeframes: {}
-        };
-        
-        Object.keys(TIMEFRAMES).forEach(tf => {
-            state.timeframes[tf] = { trend: 'up', count: 0, price: '...' };
-        });
+        const state = { activeTF: '4H', timeframes: {} };
+        Object.keys(TIMEFRAMES).forEach(tf => { state.timeframes[tf] = { trend: 'up', count: 0, price: '...' }; });
 
-        // --- RENDER ---
         function initGrid() {
             Object.keys(TIMEFRAMES).forEach(tfKey => {
                 const box = document.createElement('div');
@@ -187,7 +203,6 @@
                 box.dataset.tf = tfKey;
                 box.id = `box-${tfKey}`;
                 
-                // Applica layout salvato
                 applyBoxLayout(box, tfKey);
 
                 box.innerHTML = `
@@ -202,10 +217,11 @@
 
         function applyBoxLayout(el, tfKey) {
             const l = layout[tfKey];
-            el.style.left = `${l.x}%`;
-            el.style.top = `${l.y}%`;
-            el.style.width = `${l.w}%`;
-            el.style.height = `${l.h}%`;
+            // Usiamo calc per tenere conto del padding del container
+            el.style.left = `calc(${l.x}% + env(safe-area-inset-left))`;
+            el.style.top = `calc(${l.y}% + env(safe-area-inset-top))`;
+            el.style.width = `calc(${l.w}% - (env(safe-area-inset-left) + env(safe-area-inset-right)) / 2)`;
+            el.style.height = `calc(${l.h}% - (env(safe-area-inset-top) + env(safe-area-inset-bottom)) / 2)`;
         }
 
         function render() {
@@ -215,11 +231,8 @@
                 const countEl = document.getElementById(`count-${tfKey}`);
                 const dotsEl = document.getElementById(`dots-${tfKey}`);
 
-                if (data.trend === 'up') {
-                    box.classList.remove('down'); box.classList.add('up');
-                } else {
-                    box.classList.remove('up'); box.classList.add('down');
-                }
+                box.classList.toggle('up', data.trend === 'up');
+                box.classList.toggle('down', data.trend === 'down');
 
                 if (data.count <= 5) {
                     countEl.style.display = 'block';
@@ -228,19 +241,49 @@
                 } else {
                     countEl.style.display = 'none';
                     dotsEl.style.display = 'flex';
-                    dotsEl.innerHTML = '';
-                    for (let i = 0; i < 5; i++) dotsEl.innerHTML += `<div class="dot"></div>`;
+                    dotsEl.innerHTML = '<div class="dot"></div>'.repeat(5);
                 }
 
-                if (tfKey === state.activeTF) {
-                    box.classList.add('selected');
-                } else {
-                    box.classList.remove('selected');
-                }
+                box.classList.toggle('selected', tfKey === state.activeTF);
             });
         }
 
-        // --- API ---
+        function resolveCollisions(movedKey) {
+            const movedBox = layout[movedKey];
+            const movedCenterX = movedBox.x + (movedBox.w / 2);
+            const movedCenterY = movedBox.y + (movedBox.h / 2);
+
+            let collidedKey = null;
+
+            Object.keys(layout).forEach(key => {
+                if (key === movedKey) return;
+                const box = layout[key];
+                if (
+                    movedCenterX >= box.x && movedCenterX <= (box.x + box.w) &&
+                    movedCenterY >= box.y && movedCenterY <= (box.y + box.h)
+                ) {
+                    collidedKey = key;
+                }
+            });
+
+            if (collidedKey) {
+                const temp = { ...layout[collidedKey] };
+                layout[collidedKey] = { ...layout[movedKey] };
+                layout[movedKey] = temp;
+
+                applyBoxLayout(document.getElementById(`box-${movedKey}`), movedKey);
+                applyBoxLayout(document.getElementById(`box-${collidedKey}`), collidedKey);
+                
+                if (navigator.vibrate) navigator.vibrate([20, 30, 20]);
+            } else {
+                const rect = document.getElementById(`box-${movedKey}`).getBoundingClientRect();
+                layout[movedKey].x = (rect.left / window.innerWidth) * 100;
+                layout[movedKey].y = (rect.top / window.innerHeight) * 100;
+            }
+
+            localStorage.setItem('mondrian_layout_auto', JSON.stringify(layout));
+        }
+
         async function fetchCandles(granularity) {
             const url = `${BASE_URL}/api/v2/spot/market/candles?symbol=${SYMBOL}&granularity=${granularity}&limit=10`;
             const res = await fetch(url);
@@ -280,8 +323,7 @@
             render();
         }
 
-        // --- GESTIONE INTERAZIONI (Pointer Events) ---
-        let action = null; // 'drag', 'resize', 'swipe', 'longpress'
+        let action = null;
         let currentTarget = null;
         let startX = 0, startY = 0;
         let startW = 0, startH = 0;
@@ -292,32 +334,38 @@
         appContainer.addEventListener('pointerdown', (e) => {
             const box = e.target.closest('.box');
             if (!box) return;
-            
-            // Se è in modalità focus, non permettere drag/resize
-            if (box.classList.contains('focus-mode')) return;
 
             currentTarget = box;
-            startX = e.clientX; 
-            startY = e.clientY;
+            startX = e.clientX; startY = e.clientY;
             hasMoved = false;
 
-            const isResize = e.target.classList.contains('resize-handle');
-            
-            if (isResize) {
-                action = 'resize';
-                startW = box.offsetWidth;
-                startH = box.offsetHeight;
-                box.style.zIndex = 20;
+            if (!box.classList.contains('focus-mode')) {
+                const isResize = e.target.classList.contains('resize-handle');
+                
+                if (isResize) {
+                    action = 'resize';
+                    startW = box.offsetWidth;
+                    startH = box.offsetHeight;
+                } else {
+                    action = 'drag';
+                    const rect = box.getBoundingClientRect();
+                    startLeft = rect.left;
+                    startTop = rect.top;
+                    box.classList.add('dragging');
+                    
+                    pressTimer = setTimeout(() => {
+                        if (!hasMoved) {
+                            action = 'longpress';
+                            if (navigator.vibrate) navigator.vibrate(20);
+                        }
+                    }, 300);
+                }
             } else {
-                action = 'drag';
-                const rect = box.getBoundingClientRect();
-                startLeft = rect.left;
-                startTop = rect.top;
-                // Avvia timer per long press (per tornare alla griglia o mostrare prezzo)
+                action = 'focus-hold';
                 pressTimer = setTimeout(() => {
                     if (!hasMoved) {
-                        action = 'longpress';
-                        if (navigator.vibrate) navigator.vibrate(20);
+                        exitFocus();
+                        if (navigator.vibrate) navigator.vibrate(30);
                     }
                 }, 300);
             }
@@ -326,33 +374,26 @@
         });
 
         appContainer.addEventListener('pointermove', (e) => {
-            if (!action || !currentTarget) return;
+            if (!currentTarget) return;
 
             const deltaX = e.clientX - startX;
             const deltaY = e.clientY - startY;
             
-            if (Math.abs(deltaX) > 5 || Math.abs(deltaY) > 5) hasMoved = true;
-
-            if (action === 'drag' && hasMoved) {
+            if (Math.abs(deltaX) > 5 || Math.abs(deltaY) > 5) {
+                hasMoved = true;
                 clearTimeout(pressTimer);
+            }
+
+            if (action === 'drag') {
                 let newLeft = startLeft + deltaX;
                 let newTop = startTop + deltaY;
-                
-                // Vincoli dello schermo
-                newLeft = Math.max(0, Math.min(newLeft, window.innerWidth - currentTarget.offsetWidth));
-                newTop = Math.max(0, Math.min(newTop, window.innerHeight - currentTarget.offsetHeight));
-
                 currentTarget.style.left = `${newLeft}px`;
                 currentTarget.style.top = `${newTop}px`;
 
-            } else if (action === 'resize' && hasMoved) {
+            } else if (action === 'resize') {
                 let newW = startW + deltaX;
                 let newH = startH + deltaY;
-                
-                // Dimensione minima
-                newW = Math.max(60, newW);
-                newH = Math.max(60, newH);
-
+                newW = Math.max(60, newW); newH = Math.max(60, newH);
                 currentTarget.style.width = `${newW}px`;
                 currentTarget.style.height = `${newH}px`;
             }
@@ -360,60 +401,56 @@
 
         appContainer.addEventListener('pointerup', (e) => {
             clearTimeout(pressTimer);
-
             if (!currentTarget) return;
 
             if (action === 'drag' && hasMoved) {
-                // Salva nuove coordinate in percentuale
-                const rect = currentTarget.getBoundingClientRect();
+                currentTarget.classList.remove('dragging');
                 const tf = currentTarget.dataset.tf;
+                
+                const rect = currentTarget.getBoundingClientRect();
                 layout[tf] = {
                     x: (rect.left / window.innerWidth) * 100,
                     y: (rect.top / window.innerHeight) * 100,
                     w: (rect.width / window.innerWidth) * 100,
                     h: (rect.height / window.innerHeight) * 100
                 };
-                localStorage.setItem('mondrian_layout', JSON.stringify(layout));
-                applyBoxLayout(currentTarget, tf); // Riapplica in % per coerenza
+                
+                resolveCollisions(tf);
 
             } else if (action === 'resize' && hasMoved) {
-                const rect = currentTarget.getBoundingClientRect();
                 const tf = currentTarget.dataset.tf;
+                const rect = currentTarget.getBoundingClientRect();
                 layout[tf].w = (rect.width / window.innerWidth) * 100;
                 layout[tf].h = (rect.height / window.innerHeight) * 100;
-                localStorage.setItem('mondrian_layout', JSON.stringify(layout));
+                localStorage.setItem('mondrian_layout_auto', JSON.stringify(layout));
                 applyBoxLayout(currentTarget, tf);
 
             } else if (action === 'drag' && !hasMoved) {
-                // È STATO UN TAP
                 const tf = currentTarget.dataset.tf;
                 if (state.activeTF === tf) {
-                    showPriceAndCoin(tf); // Se tocchi quello attivo, mostri il prezzo
+                    showPriceAndCoin(tf);
                 } else {
                     state.activeTF = tf;
                     render();
                 }
                 
-                // Porta a schermo intero
                 appContainer.classList.add('has-focus');
                 currentTarget.classList.add('focus-mode');
 
-            } else if (action === 'longpress') {
-                // Logica Long Press (esci dal focus)
-                if (appContainer.classList.contains('has-focus')) {
-                    appContainer.classList.remove('has-focus');
-                    document.querySelectorAll('.box').forEach(b => b.classList.remove('focus-mode'));
-                    if (navigator.vibrate) navigator.vibrate(30);
-                }
             }
 
-            if (action === 'resize') currentTarget.style.zIndex = '';
-            
+            if (action !== 'focus-hold') currentTarget.classList.remove('dragging');
             action = null;
             currentTarget = null;
         });
 
-        // Swipe Up / Down (solo quando NON c'è focus e non si sta trascinando)
+        function exitFocus() {
+            appContainer.classList.remove('has-focus');
+            document.querySelectorAll('.box').forEach(b => b.classList.remove('focus-mode'));
+            // Forza il ricalcolo del layout per iOS
+            setTimeout(() => { Object.keys(TIMEFRAMES).forEach(tf => applyBoxLayout(document.getElementById(`box-${tf}`), tf)); }, 50);
+        }
+
         appContainer.addEventListener('touchstart', (e) => {
             if (appContainer.classList.contains('has-focus') || action) return;
             startY = e.touches[0].clientY;
@@ -427,7 +464,6 @@
             else if (deltaY < -60) showPriceAndCoin(state.activeTF);
         });
 
-        // --- ALTRE FUNZIONI ---
         function changeCoin() {
             if (navigator.vibrate) navigator.vibrate([30, 50, 30]);
             appContainer.style.opacity = '0.5';
@@ -459,7 +495,6 @@
             }, 3000);
         }
 
-        // --- INIZIO ---
         initGrid();
         updateAll();
         setInterval(() => { if(!action) updateAll(); }, 15000);
