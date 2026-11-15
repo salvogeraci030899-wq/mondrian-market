@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>MondrianMarket</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@200;400;600&display=swap');
+
+        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; }
+        
+        body, html {
+            width: 100%; height: 100%; overflow: hidden;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background-color: #000;
+            color: #F0F0F0;
+        }
+
+        #app-container {
+            width: 100%; height: 100%; position: relative;
+            overflow: hidden;
+        }
+
+        /* --- BOX DEI TIMEFRAME --- */
+        .box {
+            position: absolute;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background-color: #0B1B2B; /* Default Up */
+            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            overflow: hidden;
+            border: 3px solid #000; /* Linee Mondrian */
+            box-shadow: inset 0 0 0 1px rgba(255,255,255,0.05);
+            /* Z-index verrà gestito in base al focus */
+        }
+
+        .box.up { background-color: #0B1B2B; }
+        .box.down { background-color: #2B0B0B; }
+        
+        .box.selected {
+            border: 3px solid #F7D117; /* Giallo Mondrian */
+            z-index: 10;
+        }
+
+        /* Modalità Focus (Schermo Intero) */
+        .box.focus-mode {
+            top: 0 !important;
+            left: 0 !important;
+            width: 100% !important;
+            height: 100% !important;
+            border: none;
+            border-radius: 0;
+            z-index: 50;
+        }
+        
+        /* Se un box è in focus, gli altri si nascondono */
+        #app-container.has-focus .box:not(.focus-mode) {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .tf-label {
+            position: absolute;
+            top: 15px; left: 15px;
+            font-size: 0.8rem; font-weight: 600;
+            color: rgba(255,255,255,0.4);
+            letter-spacing: 0.1em;
+            pointer-events: none;
+        }
+
+        .box.focus-mode .tf-label {
+            top: 40px; left: 40px; font-size: 1.2rem;
+        }
+
+        .tf-count {
+            font-size: 3rem; font-weight: 200; line-height: 1;
+            text-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            pointer-events: none;
+        }
+        
+        .box.focus-mode .tf-count {
+            font-size: 10rem;
+        }
+
+        .tf-dots { display: flex; gap: 6px; margin-top: 10px; pointer-events: none; }
+        .box.focus-mode .tf-dots { gap: 15px; margin-top: 20px; }
+        .dot { width: 10px; height: 10px; border-radius: 50%; background-color: #E0E0E0; }
+        .box.focus-mode .dot { width: 20px; height: 20px; }
+
+        /* Maniglia per il Resize (In basso a destra) */
+        .resize-handle {
+            position: absolute;
+            bottom: 0; right: 0;
+            width: 25px; height: 25px;
+            cursor: se-resize;
+            z-index: 20;
+            display: flex; justify-content: flex-end; align-items: flex-end;
+            padding: 5px;
+        }
+        .resize-handle::after {
+            content: "";
+            width: 10px; height: 10px;
+            border-right: 2px solid rgba(255,255,255,0.2);
+            border-bottom: 2px solid rgba(255,255,255,0.2);
+        }
+
+        .box.focus-mode .resize-handle { display: none; }
+
+        /* --- PILLOLE --- */
+        #price-pill, #coin-pill {
+            position: absolute; left: 50%;
+            background: rgba(20, 20, 20, 0.8);
+            backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 50px;
+            display: flex; align-items: center;
+            opacity: 0; transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            z-index: 100; pointer-events: none;
+        }
+
+        #price-pill { bottom: 10%; transform: translate(-50%, 20px); padding: 12px 24px; font-size: 1.2rem; font-weight: 300; gap: 15px;}
+        #price-pill.show { opacity: 1; transform: translate(-50%, 0); }
+        #price-pill .tf-label { position: static; font-size: 0.8rem; color: #aaa; }
+
+        #coin-pill { top: 10%; transform: translate(-50%, -20px); padding: 8px 20px; font-size: 1rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase;}
+        #coin-pill.show { opacity: 1; transform: translate(-50%, 0); }
+
+    </style>
+</head>
+<body>
+
+    <div id="app-container">
+        <!-- I box vengono generati qui dal JS -->
+        <div id="coin-pill">BTC</div>
+        <div id="price-pill">
+            <span id="pill-price">-</span>
+            <span class="tf-label" id="pill-tf">4H</span>
+        </div>
+    </div>
+
+    <script>
+        const COINS = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'XRPUSDT', 'BNBUSDT'];
+        let activeCoinIndex = 0;
+        let SYMBOL = COINS[activeCoinIndex];
+        const BASE_URL = 'https://api.bitget.com';
+        const appContainer = document.getElementById('app-container');
+
+        // Layout Iniziale (posizioni e dimensioni in percentuale)
+        // Proporzioni Mondrian predefinite
+        const defaultLayout = {
+            '1D':  { x: 0, y: 0, w: 40, h: 60 },
+            '4H':  { x: 65, y: 0, w: 35, h: 100 },
+            '1H':  { x: 40, y: 0, w: 25, h: 40 },
+            '12H': { x: 40, y: 40, w: 25, h: 20 },
+            '15m': { x: 0, y: 60, w: 40, h: 40 },
+            '30m': { x: 40, y: 60, w: 25, h: 40 }
+        };
+
+        // Carica layout da localStorage o usa il default
+        let layout = JSON.parse(localStorage.getItem('mondrian_layout')) || defaultLayout;
+
+        const TIMEFRAMES = {
+            '15m': { granularity: '15min' },
+            '30m': { granularity: '30min' },
+            '1H':  { granularity: '1h'    },
+            '4H':  { granularity: '4h'    },
+            '12H': { granularity: '12h'   },
+            '1D':  { granularity: '1day'  }
+        };
+
+        const state = {
+            activeTF: '4H',
+            timeframes: {}
+        };
+        
+        Object.keys(TIMEFRAMES).forEach(tf => {
+            state.timeframes[tf] = { trend: 'up', count: 0, price: '...' };
+        });
+
+        // --- RENDER ---
+        function initGrid() {
+            Object.keys(TIMEFRAMES).forEach(tfKey => {
+                const box = document.createElement('div');
+                box.className = `box up`;
+                box.dataset.tf = tfKey;
+                box.id = `box-${tfKey}`;
+                
+                // Applica layout salvato
+                applyBoxLayout(box, tfKey);
+
+                box.innerHTML = `
+                    <div class="tf-label">${tfKey}</div>
+                    <div class="tf-count" id="count-${tfKey}">-</div>
+                    <div class="tf-dots" id="dots-${tfKey}" style="display:none;"></div>
+                    <div class="resize-handle" data-resize="${tfKey}"></div>
+                `;
+                appContainer.appendChild(box);
+            });
+        }
+
+        function applyBoxLayout(el, tfKey) {
+            const l = layout[tfKey];
+            el.style.left = `${l.x}%`;
+            el.style.top = `${l.y}%`;
+            el.style.width = `${l.w}%`;
+            el.style.height = `${l.h}%`;
+        }
+
+        function render() {
+            Object.keys(TIMEFRAMES).forEach(tfKey => {
+                const data = state.timeframes[tfKey];
+                const box = document.getElementById(`box-${tfKey}`);
+                const countEl = document.getElementById(`count-${tfKey}`);
+                const dotsEl = document.getElementById(`dots-${tfKey}`);
+
+                if (data.trend === 'up') {
+                    box.classList.remove('down'); box.classList.add('up');
+                } else {
+                    box.classList.remove('up'); box.classList.add('down');
+                }
+
+                if (data.count <= 5) {
+                    countEl.style.display = 'block';
+                    countEl.textContent = data.count > 0 ? data.count : '-';
+                    dotsEl.style.display = 'none';
+                } else {
+                    countEl.style.display = 'none';
+                    dotsEl.style.display = 'flex';
+                    dotsEl.innerHTML = '';
+                    for (let i = 0; i < 5; i++) dotsEl.innerHTML += `<div class="dot"></div>`;
+                }
+
+                if (tfKey === state.activeTF) {
+                    box.classList.add('selected');
+                } else {
+                    box.classList.remove('selected');
+                }
+            });
+        }
+
+        // --- API ---
+        async function fetchCandles(granularity) {
+            const url = `${BASE_URL}/api/v2/spot/market/candles?symbol=${SYMBOL}&granularity=${granularity}&limit=10`;
+            const res = await fetch(url);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const json = await res.json();
+            if (json.code !== '00000') throw new Error(json.msg || 'API error');
+            return json.data;
+        }
+
+        function calculateStreak(candles) {
+            if (!candles || candles.length === 0) return { trend: 'up', count: 0 };
+            let streak = 0, lastDirection = null;
+            for (let i = candles.length - 1; i >= 0; i--) {
+                const [, open, , , close] = candles[i];
+                const openF = parseFloat(open), closeF = parseFloat(close);
+                let dir = closeF > openF ? 'up' : (closeF < openF ? 'down' : 'neutral');
+                if (dir === 'neutral') continue;
+                if (lastDirection === null) { lastDirection = dir; streak = 1; }
+                else if (dir === lastDirection) { streak++; }
+                else { break; }
+            }
+            return { trend: lastDirection || 'up', count: streak };
+        }
+
+        async function updateTimeframe(tfKey) {
+            try {
+                const candles = await fetchCandles(TIMEFRAMES[tfKey].granularity);
+                const { trend, count } = calculateStreak(candles);
+                let price = parseFloat(candles[candles.length - 1][4]);
+                let priceStr = price > 1000 ? price.toFixed(2) : price.toFixed(4);
+                state.timeframes[tfKey] = { trend, count, price: priceStr.replace(/\B(?=(\d{3})+(?!\d))/g, ",") };
+            } catch (err) { console.error(`Errore ${tfKey}:`, err); }
+        }
+
+        async function updateAll() {
+            await Promise.all(Object.keys(TIMEFRAMES).map(tf => updateTimeframe(tf)));
+            render();
+        }
+
+        // --- GESTIONE INTERAZIONI (Pointer Events) ---
+        let action = null; // 'drag', 'resize', 'swipe', 'longpress'
+        let currentTarget = null;
+        let startX = 0, startY = 0;
+        let startW = 0, startH = 0;
+        let startLeft = 0, startTop = 0;
+        let pressTimer;
+        let hasMoved = false;
+
+        appContainer.addEventListener('pointerdown', (e) => {
+            const box = e.target.closest('.box');
+            if (!box) return;
+            
+            // Se è in modalità focus, non permettere drag/resize
+            if (box.classList.contains('focus-mode')) return;
+
+            currentTarget = box;
+            startX = e.clientX; 
+            startY = e.clientY;
+            hasMoved = false;
+
+            const isResize = e.target.classList.contains('resize-handle');
+            
+            if (isResize) {
+                action = 'resize';
+                startW = box.offsetWidth;
+                startH = box.offsetHeight;
+                box.style.zIndex = 20;
+            } else {
+                action = 'drag';
+                const rect = box.getBoundingClientRect();
+                startLeft = rect.left;
+                startTop = rect.top;
+                // Avvia timer per long press (per tornare alla griglia o mostrare prezzo)
+                pressTimer = setTimeout(() => {
+                    if (!hasMoved) {
+                        action = 'longpress';
+                        if (navigator.vibrate) navigator.vibrate(20);
+                    }
+                }, 300);
+            }
+
+            box.setPointerCapture(e.pointerId);
+        });
+
+        appContainer.addEventListener('pointermove', (e) => {
+            if (!action || !currentTarget) return;
+
+            const deltaX = e.clientX - startX;
+            const deltaY = e.clientY - startY;
+            
+            if (Math.abs(deltaX) > 5 || Math.abs(deltaY) > 5) hasMoved = true;
+
+            if (action === 'drag' && hasMoved) {
+                clearTimeout(pressTimer);
+                let newLeft = startLeft + deltaX;
+                let newTop = startTop + deltaY;
+                
+                // Vincoli dello schermo
+                newLeft = Math.max(0, Math.min(newLeft, window.innerWidth - currentTarget.offsetWidth));
+                newTop = Math.max(0, Math.min(newTop, window.innerHeight - currentTarget.offsetHeight));
+
+                currentTarget.style.left = `${newLeft}px`;
+                currentTarget.style.top = `${newTop}px`;
+
+            } else if (action === 'resize' && hasMoved) {
+                let newW = startW + deltaX;
+                let newH = startH + deltaY;
+                
+                // Dimensione minima
+                newW = Math.max(60, newW);
+                newH = Math.max(60, newH);
+
+                currentTarget.style.width = `${newW}px`;
+                currentTarget.style.height = `${newH}px`;
+            }
+        });
+
+        appContainer.addEventListener('pointerup', (e) => {
+            clearTimeout(pressTimer);
+
+            if (!currentTarget) return;
+
+            if (action === 'drag' && hasMoved) {
+                // Salva nuove coordinate in percentuale
+                const rect = currentTarget.getBoundingClientRect();
+                const tf = currentTarget.dataset.tf;
+                layout[tf] = {
+                    x: (rect.left / window.innerWidth) * 100,
+                    y: (rect.top / window.innerHeight) * 100,
+                    w: (rect.width / window.innerWidth) * 100,
+                    h: (rect.height / window.innerHeight) * 100
+                };
+                localStorage.setItem('mondrian_layout', JSON.stringify(layout));
+                applyBoxLayout(currentTarget, tf); // Riapplica in % per coerenza
+
+            } else if (action === 'resize' && hasMoved) {
+                const rect = currentTarget.getBoundingClientRect();
+                const tf = currentTarget.dataset.tf;
+                layout[tf].w = (rect.width / window.innerWidth) * 100;
+                layout[tf].h = (rect.height / window.innerHeight) * 100;
+                localStorage.setItem('mondrian_layout', JSON.stringify(layout));
+                applyBoxLayout(currentTarget, tf);
+
+            } else if (action === 'drag' && !hasMoved) {
+                // È STATO UN TAP
+                const tf = currentTarget.dataset.tf;
+                if (state.activeTF === tf) {
+                    showPriceAndCoin(tf); // Se tocchi quello attivo, mostri il prezzo
+                } else {
+                    state.activeTF = tf;
+                    render();
+                }
+                
+                // Porta a schermo intero
+                appContainer.classList.add('has-focus');
+                currentTarget.classList.add('focus-mode');
+
+            } else if (action === 'longpress') {
+                // Logica Long Press (esci dal focus)
+                if (appContainer.classList.contains('has-focus')) {
+                    appContainer.classList.remove('has-focus');
+                    document.querySelectorAll('.box').forEach(b => b.classList.remove('focus-mode'));
+                    if (navigator.vibrate) navigator.vibrate(30);
+                }
+            }
+
+            if (action === 'resize') currentTarget.style.zIndex = '';
+            
+            action = null;
+            currentTarget = null;
+        });
+
+        // Swipe Up / Down (solo quando NON c'è focus e non si sta trascinando)
+        appContainer.addEventListener('touchstart', (e) => {
+            if (appContainer.classList.contains('has-focus') || action) return;
+            startY = e.touches[0].clientY;
+        }, { passive: false });
+
+        appContainer.addEventListener('touchend', (e) => {
+            if (appContainer.classList.contains('has-focus') || action) return;
+            const deltaY = e.changedTouches[0].clientY - startY;
+            
+            if (deltaY > 60) changeCoin();
+            else if (deltaY < -60) showPriceAndCoin(state.activeTF);
+        });
+
+        // --- ALTRE FUNZIONI ---
+        function changeCoin() {
+            if (navigator.vibrate) navigator.vibrate([30, 50, 30]);
+            appContainer.style.opacity = '0.5';
+            activeCoinIndex = (activeCoinIndex + 1) % COINS.length;
+            SYMBOL = COINS[activeCoinIndex];
+            document.getElementById('coin-pill').textContent = SYMBOL.replace('USDT', '');
+            document.getElementById('coin-pill').classList.add('show');
+            
+            updateAll().then(() => {
+                appContainer.style.opacity = '1';
+                setTimeout(() => document.getElementById('coin-pill').classList.remove('show'), 2000);
+            });
+        }
+
+        function showPriceAndCoin(tfKey) {
+            if (navigator.vibrate) navigator.vibrate(20);
+            const tf = state.timeframes[tfKey];
+            const pricePill = document.getElementById('price-pill');
+            document.getElementById('pill-price').textContent = tf.price;
+            document.getElementById('pill-tf').textContent = tfKey;
+            document.getElementById('coin-pill').textContent = SYMBOL.replace('USDT', '');
+            
+            pricePill.classList.add('show');
+            document.getElementById('coin-pill').classList.add('show');
+            
+            setTimeout(() => {
+                pricePill.classList.remove('show');
+                document.getElementById('coin-pill').classList.remove('show');
+            }, 3000);
+        }
+
+        // --- INIZIO ---
+        initGrid();
+        updateAll();
+        setInterval(() => { if(!action) updateAll(); }, 15000);
+    </script>
+</body>
+</html>
