@@ -6,7 +6,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#000000">
-    <title>MondrianMarket · Coin Long Press</title>
+    <title>MondrianMarket · True Edge-to-Edge</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
 
@@ -30,7 +30,7 @@
             color: var(--mondrian-white);
         }
 
-        /* --- GRIGLIA --- */
+        /* --- GRIGLIA EDGE-TO-EDGE --- */
         #grid-container {
             display: grid;
             grid-template-columns: 25% 25% 25% 25%;
@@ -39,9 +39,8 @@
             width: 100%;
             height: 100%;
             background-color: var(--mondrian-black); 
-            padding: 4px; 
-            padding-top: max(4px, env(safe-area-inset-top));
-            padding-bottom: max(4px, env(safe-area-inset-bottom));
+            /* Rimosse le safe-area qui: il colore riempie tutto */
+            padding: 3px; 
             overflow: hidden;
             z-index: 1;
         }
@@ -67,6 +66,7 @@
             position: fixed;
             top: 0; left: 0; width: 100vw !important; height: 100dvh !important;
             z-index: 100;
+            /* In focus mode il padding è sul box intero */
             padding-top: env(safe-area-inset-top);
             padding-bottom: env(safe-area-inset-bottom);
         }
@@ -97,7 +97,7 @@
 
         .box.focus-mode .outline-square { border-width: 4px; }
 
-        /* --- LINGUETTA DRAG BOX --- */
+        /* --- LINGUETTA DRAG BOX (In alto a destra) --- */
         .drag-handle {
             position: absolute;
             top: 0; right: 0;
@@ -111,9 +111,15 @@
             cursor: grab;
             text-shadow: 2px 2px 0px rgba(0,0,0,0.3);
         }
+        
+        /* Spingiamo in basso la linguetta solo per i box della prima riga */
+        .box.row-top .drag-handle {
+            top: env(safe-area-inset-top);
+        }
+
         .box.focus-mode .drag-handle { display: none; }
 
-        /* --- MANIGLIA RESIZE BOX --- */
+        /* --- MANIGLIA RESIZE BOX (In basso a destra) --- */
         .box-resize-handle {
             position: absolute;
             bottom: 0; right: 0;
@@ -127,6 +133,12 @@
             border-right: 3px solid var(--mondrian-white);
             border-bottom: 3px solid var(--mondrian-white);
         }
+
+        /* Spingiamo in alto la maniglia solo per i box della seconda riga */
+        .box.row-bottom .box-resize-handle {
+            bottom: env(safe-area-inset-bottom);
+        }
+
         .box.focus-mode .box-resize-handle { display: none; }
 
         /* --- WIDGET GLOBALI FLUTTUANTI --- */
@@ -152,13 +164,13 @@
             z-index: 210;
         }
 
-        /* Effetto visivo per il long press sulla Coin */
         .global-widget.holding {
             transform: scale(0.95);
             filter: brightness(0.8);
         }
 
         #global-coin-widget {
+            /* Safe area inclusa per il widget fluttuante */
             top: calc(15% + env(safe-area-inset-top));
             left: 20px;
             font-size: 1.5rem;
@@ -169,6 +181,7 @@
         }
 
         #global-price-widget {
+            /* Safe area inclusa per il widget fluttuante */
             bottom: calc(15% + env(safe-area-inset-bottom));
             right: 20px;
             font-size: 1.2rem;
@@ -258,7 +271,9 @@
 
             tfDataArray.forEach((tfKey, index) => {
                 const box = document.createElement('div');
-                box.className = `box up`;
+                // Aggiungiamo la classe row-top o row-bottom in base all'indice
+                const isTopRow = index < 4;
+                box.className = `box up ${isTopRow ? 'row-top' : 'row-bottom'}`;
                 box.dataset.tf = tfKey;
                 box.dataset.index = index;
                 box.id = `box-${tfKey}`;
@@ -401,7 +416,7 @@
             pointerState.longPressFired = false;
             pointerState.longPressTimer = null;
 
-            // 1. GESTIONE WIDGET GLOBALI (Coin/Prezzo)
+            // 1. GESTIONE WIDGET GLOBALI
             if (globalWidget) {
                 pointerState.target = globalWidget;
                 const rect = globalWidget.getBoundingClientRect();
@@ -413,13 +428,11 @@
                     pointerState.type = 'global-drag';
                     globalWidget.classList.add('dragging');
                     
-                    // LOGICA LONG PRESS SOLO PER LA COIN
                     if (globalWidget.id === 'global-coin-widget') {
                         pointerState.longPressTimer = setTimeout(() => {
                             pointerState.longPressFired = true;
                             globalWidget.classList.add('holding');
                             changeCoin();
-                            // Rimuoviamo l'effetto holding dopo un breve rilascio
                             setTimeout(() => { globalWidget.classList.remove('holding'); }, 300);
                         }, 500);
                     }
@@ -470,7 +483,6 @@
             
             const dist = Math.abs(e.clientX - pointerState.startX) + Math.abs(e.clientY - pointerState.startY);
             
-            // Se ci muoviamo, annulliamo qualsiasi timer di long press
             if (dist > 10 && pointerState.longPressTimer && !pointerState.longPressFired) {
                 clearTimeout(pointerState.longPressTimer);
                 pointerState.longPressTimer = null;
@@ -479,7 +491,6 @@
 
             e.preventDefault();
 
-            // DRAG WIDGET GLOBALE
             if (pointerState.type === 'global-drag' && dist > 5) {
                 const deltaX = e.clientX - pointerState.startX;
                 const deltaY = e.clientY - pointerState.startY;
@@ -496,7 +507,6 @@
                 pointerState.target.style.right = 'auto';
             }
             
-            // RESIZE WIDGET GLOBALE
             else if (pointerState.type === 'global-resize' && dist > 5) {
                 const deltaX = e.clientX - pointerState.startX;
                 const deltaY = e.clientY - pointerState.startY;
@@ -511,7 +521,6 @@
                 pointerState.target.style.height = `${newH}px`;
             }
 
-            // DRAG BOX (Scambio posizioni)
             else if (pointerState.type === 'box-drag' && dist > 10) {
                 const element = document.elementFromPoint(e.clientX, e.clientY);
                 const targetBox = element ? element.closest('.box') : null;
@@ -522,7 +531,6 @@
                 }
             }
 
-            // RESIZE BOX
             else if (pointerState.type === 'box-resize' && dist > 5) {
                 const deltaX = e.clientX - pointerState.startX;
                 const deltaY = e.clientY - pointerState.startY;
@@ -564,13 +572,11 @@
             
             clearTimeout(pointerState.longPressTimer);
 
-            // Rilascio Drag Globale
             if (pointerState.type === 'global-drag') {
                 pointerState.target.classList.remove('dragging');
-                pointerState.target.classList.remove('holding'); // Rimuove eventuale effetto holding
+                pointerState.target.classList.remove('holding');
             }
             
-            // Rilascio Drag Box (Scambio)
             else if (pointerState.type === 'box-drag') {
                 const element = document.elementFromPoint(e.clientX, e.clientY);
                 const targetBox = element ? element.closest('.box') : null;
@@ -591,7 +597,6 @@
                 document.querySelectorAll('.box').forEach(b => b.classList.remove('drag-over'));
             }
             
-            // Rilascio Focus
             else if (pointerState.type === 'focus-hold') {
                 pointerState.target.classList.remove('focus-holding');
                 if (isTap && !pointerState.longPressFired) {
