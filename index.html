@@ -6,7 +6,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#000000">
-    <title>MondrianMarket · True Edge-to-Edge</title>
+    <title>MondrianMarket · Saved State</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
 
@@ -39,7 +39,6 @@
             width: 100%;
             height: 100%;
             background-color: var(--mondrian-black); 
-            /* Rimosse le safe-area qui: il colore riempie tutto */
             padding: 3px; 
             overflow: hidden;
             z-index: 1;
@@ -66,7 +65,6 @@
             position: fixed;
             top: 0; left: 0; width: 100vw !important; height: 100dvh !important;
             z-index: 100;
-            /* In focus mode il padding è sul box intero */
             padding-top: env(safe-area-inset-top);
             padding-bottom: env(safe-area-inset-bottom);
         }
@@ -97,7 +95,7 @@
 
         .box.focus-mode .outline-square { border-width: 4px; }
 
-        /* --- LINGUETTA DRAG BOX (In alto a destra) --- */
+        /* --- LINGUETTA DRAG BOX --- */
         .drag-handle {
             position: absolute;
             top: 0; right: 0;
@@ -112,14 +110,10 @@
             text-shadow: 2px 2px 0px rgba(0,0,0,0.3);
         }
         
-        /* Spingiamo in basso la linguetta solo per i box della prima riga */
-        .box.row-top .drag-handle {
-            top: env(safe-area-inset-top);
-        }
-
+        .box.row-top .drag-handle { top: env(safe-area-inset-top); }
         .box.focus-mode .drag-handle { display: none; }
 
-        /* --- MANIGLIA RESIZE BOX (In basso a destra) --- */
+        /* --- MANIGLIA RESIZE BOX --- */
         .box-resize-handle {
             position: absolute;
             bottom: 0; right: 0;
@@ -134,11 +128,7 @@
             border-bottom: 3px solid var(--mondrian-white);
         }
 
-        /* Spingiamo in alto la maniglia solo per i box della seconda riga */
-        .box.row-bottom .box-resize-handle {
-            bottom: env(safe-area-inset-bottom);
-        }
-
+        .box.row-bottom .box-resize-handle { bottom: env(safe-area-inset-bottom); }
         .box.focus-mode .box-resize-handle { display: none; }
 
         /* --- WIDGET GLOBALI FLUTTUANTI --- */
@@ -170,7 +160,6 @@
         }
 
         #global-coin-widget {
-            /* Safe area inclusa per il widget fluttuante */
             top: calc(15% + env(safe-area-inset-top));
             left: 20px;
             font-size: 1.5rem;
@@ -181,7 +170,6 @@
         }
 
         #global-price-widget {
-            /* Safe area inclusa per il widget fluttuante */
             bottom: calc(15% + env(safe-area-inset-bottom));
             right: 20px;
             font-size: 1.2rem;
@@ -226,7 +214,6 @@
 
     <div id="grid-container"></div>
 
-    <!-- Widget Fluttuanti Globali -->
     <div class="global-widget" id="global-coin-widget">
         <span id="coin-text">BTC</span>
         <div class="global-resize-handle" data-resize="coin"></div>
@@ -260,6 +247,77 @@
         let gridCols = [25, 25, 25, 25]; 
         let gridRows = [50, 50]; 
 
+        // --- SALVATAGGIO E CARICAMENTO STATO ---
+        const STORAGE_KEY = 'mondrian_state_v1';
+
+        function saveState() {
+            const coinW = document.getElementById('global-coin-widget');
+            const priceW = document.getElementById('global-price-widget');
+            
+            const savedData = {
+                gridCols,
+                gridRows,
+                activeCoinIndex,
+                coinWidget: {
+                    top: coinW.style.top || (15 + 'vh'), // fallback visivo
+                    left: coinW.style.left || '20px',
+                    width: coinW.style.width || '100px',
+                    height: coinW.style.height || '50px'
+                },
+                priceWidget: {
+                    top: priceW.style.top,
+                    left: priceW.style.left,
+                    width: priceW.style.width || '140px',
+                    height: priceW.style.height || '50px'
+                }
+            };
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(savedData));
+        }
+
+        function loadState() {
+            const saved = localStorage.getItem(STORAGE_KEY);
+            if (!saved) return false;
+            try {
+                const data = JSON.parse(saved);
+                
+                if (data.gridCols && data.gridRows) {
+                    gridCols = data.gridCols;
+                    gridRows = data.gridRows;
+                }
+
+                if (data.activeCoinIndex !== undefined) {
+                    activeCoinIndex = data.activeCoinIndex;
+                    SYMBOL = COINS[activeCoinIndex];
+                    document.getElementById('coin-text').textContent = SYMBOL.replace('USDT', '');
+                }
+
+                if (data.coinWidget) {
+                    const w = document.getElementById('global-coin-widget');
+                    if(data.coinWidget.top) w.style.top = data.coinWidget.top;
+                    if(data.coinWidget.left) w.style.left = data.coinWidget.left;
+                    if(data.coinWidget.width) w.style.width = data.coinWidget.width;
+                    if(data.coinWidget.height) w.style.height = data.coinWidget.height;
+                    w.style.bottom = 'auto';
+                    w.style.right = 'auto';
+                }
+
+                if (data.priceWidget) {
+                    const w = document.getElementById('global-price-widget');
+                    if(data.priceWidget.top) w.style.top = data.priceWidget.top;
+                    if(data.priceWidget.left) w.style.left = data.priceWidget.left;
+                    if(data.priceWidget.width) w.style.width = data.priceWidget.width;
+                    if(data.priceWidget.height) w.style.height = data.priceWidget.height;
+                    w.style.bottom = 'auto';
+                    w.style.right = 'auto';
+                }
+
+                return true;
+            } catch (e) {
+                console.error("Errore caricamento stato", e);
+                return false;
+            }
+        }
+
         function applyGridLayout() {
             gridContainer.style.gridTemplateColumns = `${gridCols[0]}% ${gridCols[1]}% ${gridCols[2]}% ${gridCols[3]}%`;
             gridContainer.style.gridTemplateRows = `${gridRows[0]}% ${gridRows[1]}%`;
@@ -271,7 +329,6 @@
 
             tfDataArray.forEach((tfKey, index) => {
                 const box = document.createElement('div');
-                // Aggiungiamo la classe row-top o row-bottom in base all'indice
                 const isTopRow = index < 4;
                 box.className = `box up ${isTopRow ? 'row-top' : 'row-bottom'}`;
                 box.dataset.tf = tfKey;
@@ -391,6 +448,8 @@
             updateAll().then(() => {
                 setTimeout(() => { coinToast.classList.remove('show'); }, 1200);
             });
+            
+            saveState(); // Salva la coin appena cambiata
         }
 
         // --- GESTIONE EVENTI ---
@@ -416,7 +475,6 @@
             pointerState.longPressFired = false;
             pointerState.longPressTimer = null;
 
-            // 1. GESTIONE WIDGET GLOBALI
             if (globalWidget) {
                 pointerState.target = globalWidget;
                 const rect = globalWidget.getBoundingClientRect();
@@ -441,7 +499,6 @@
                 return;
             }
 
-            // 2. GESTIONE BOX
             if (!box) return;
             pointerState.target = box;
 
@@ -575,8 +632,13 @@
             if (pointerState.type === 'global-drag') {
                 pointerState.target.classList.remove('dragging');
                 pointerState.target.classList.remove('holding');
+                saveState(); // Salva la posizione del widget
             }
             
+            else if (pointerState.type === 'global-resize') {
+                saveState(); // Salva la grandezza del widget
+            }
+
             else if (pointerState.type === 'box-drag') {
                 const element = document.elementFromPoint(e.clientX, e.clientY);
                 const targetBox = element ? element.closest('.box') : null;
@@ -590,11 +652,16 @@
                     tfDataArray[indexB] = temp;
 
                     initGrid();
+                    saveState(); // Salva lo scambio dei box
                     if (navigator.vibrate) navigator.vibrate([30, 50, 30]);
                 }
                 
                 pointerState.target.classList.remove('dragging');
                 document.querySelectorAll('.box').forEach(b => b.classList.remove('drag-over'));
+            }
+            
+            else if (pointerState.type === 'box-resize') {
+                saveState(); // Salva il ridimensionamento della griglia
             }
             
             else if (pointerState.type === 'focus-hold') {
@@ -616,7 +683,14 @@
         document.addEventListener('pointerup', handlePointerUp);
         document.addEventListener('contextmenu', e => e.preventDefault());
 
-        document.getElementById('coin-text').textContent = SYMBOL.replace('USDT', '');
+        // --- INIZIO ---
+        // Tenta di caricare lo stato, se fallisce inizializza da zero
+        const hasLoaded = loadState();
+        
+        if (!hasLoaded) {
+            document.getElementById('coin-text').textContent = SYMBOL.replace('USDT', '');
+        }
+        
         initGrid();
         updateAll();
         setInterval(updateAll, 15000);
